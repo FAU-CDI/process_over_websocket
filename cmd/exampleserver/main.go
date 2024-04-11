@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/FAU-CDI/process_over_websocket"
 	"github.com/FAU-CDI/process_over_websocket/proto"
@@ -16,7 +18,7 @@ func main() {
 		log.Printf("got request for %s %v", name, args)
 
 		// must be the echo handler
-		if name != "echo" {
+		if name != "tick" {
 			return nil, proto.ErrHandlerUnknownProcess
 		}
 		if len(args) != 0 {
@@ -29,9 +31,15 @@ func main() {
 			log.Println("starting new process")
 			defer log.Println("finished client")
 
-			// and copy things over
-			_, err := io.Copy(output, input)
-			return err
+			// and begin ticking 1 second each
+			for {
+				select {
+				case <-time.After(time.Second):
+					fmt.Fprintln(output, "tick")
+				case <-ctx.Done():
+					return nil
+				}
+			}
 		}), nil
 	})
 

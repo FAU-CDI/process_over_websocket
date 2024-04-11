@@ -16,6 +16,9 @@ export default class Call {
   /** called right before sending the request */
   public beforeCall?: (this: Call) => void
 
+  /** called right after the connection has been established */
+  public onConnect?: (this: Call) => void
+
   /** called right after the socket is closed */
   public afterCall?: (this: Call, result: Result) => void
 
@@ -56,9 +59,13 @@ export default class Call {
           this.beforeCall()
         }
         ws.send(Buffer.from(JSON.stringify(this.call), 'utf8'))
+
+        if (this.onConnect != null) {
+          this.onConnect()
+        }
       }
 
-      ws.onmessage = ({ data }) => {
+      ws.onmessage = ({ data }: { data: unknown }) => {
         // if this is a string it is a log line
         if (typeof data === 'string') {
           if (this.onLogLine != null) {
@@ -76,7 +83,7 @@ export default class Call {
         }
       }
 
-      ws.onerror = (err) => {
+      ws.onerror = (err: unknown) => {
         this.close()
 
         // call the handler and reject

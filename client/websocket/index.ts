@@ -52,7 +52,7 @@ export default class Call {
       this.ws = ws // make it available to other things
 
       // result is a promise, because some APIs in the browser are async
-      let result = Promise.resolve(JSON.stringify({ success: false, message: 'Unknown error' }))
+      let result = Promise.resolve(JSON.stringify({ success: false, message: 'unknown (client side) error' }))
 
       ws.onopen = () => {
         if (this.beforeCall != null) {
@@ -94,8 +94,6 @@ export default class Call {
       }
 
       ws.onclose = () => {
-        this.close()
-
         // decode the result
         result
           .then(t => JSON.parse(t))
@@ -106,6 +104,7 @@ export default class Call {
             resolve(res)
           })
           .catch((e) => console.error(e))
+          .finally(() => this.close() )
       }
     })
   }
@@ -128,6 +127,19 @@ export default class Call {
     }
 
     ws.send(Buffer.from(JSON.stringify({ signal: 'cancel' }), 'utf8'))
+  }
+
+  /** 
+   * closeInput closes the input from the client
+   * Any further text received on the server side will be ignored.
+   */
+  closeInput (): void {
+    const ws = this.ws
+    if (ws == null) {
+      throw new Error('websocket not connected')
+    }
+
+    ws.send(Buffer.from(JSON.stringify({ signal: 'close' }), 'utf8'))
   }
 
   /** close closes this websocket connection */

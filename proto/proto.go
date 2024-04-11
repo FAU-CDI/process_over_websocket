@@ -16,6 +16,7 @@ type Signal string
 
 const (
 	SignalCancel Signal = "cancel"
+	SignalClose  Signal = "close"
 )
 
 // ResultMessage is sent by the server to the client to report the success of a remote procedure

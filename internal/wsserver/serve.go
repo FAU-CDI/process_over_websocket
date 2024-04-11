@@ -16,10 +16,7 @@ import (
 var (
 	messageBufferSize = 5 // size for internal message buffers; should be > 1
 
-	readCallTimeout = 100 * time.Second // timeout for reading the call parameters
-
-	errProtocolError   = errors.New("protocol error")
-	errReadCallTimeout = errors.New("timeout reading call parameters")
+	readCallTimeout = time.Second // timeout for reading the call parameters
 )
 
 var (
@@ -48,7 +45,7 @@ func checkSubprotocol(conn *websocket.Connection) error {
 //
 // To call an action, a client should send a [proto.CallMessage] struct.
 // The server will then start handling input and output (via text messages).
-// If the client sends a [proto.SignalMessage], the signal is propragnated to the underlying context.
+// If the client sends a [proto.SignalMessage], the signal is propagated to the underlying context.
 // Finally it will send a [proto.ResultMessage] once handling is complete.
 func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 	// check that the right subprotocol is set, or bail out
@@ -96,45 +93,107 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 		<-conn.Write(message)
 	}()
 
-	// create channels to receive text and bytes messages
-	textMessages := make(chan string, messageBufferSize)
-	binaryMessages := make(chan []byte, messageBufferSize)
+	// create a channel for all future text messages
+	// which will receive a nil to close
+	var (
+		textMessages   = make(chan []byte, messageBufferSize) // input text from the client
+		initialMessage = make(chan []byte, 1)                 // initial binary message (only ever received once)
+	)
 
-	// start reading text and binary messages
-	// and redirect everything to the right channels
+	// create a context to be canceled once done
+	ctx, cancel := context.WithCancelCause(conn.Context())
+	defer cancel(proto.ErrCancelClientGone)
+
+	// start processing messages
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
 		defer close(textMessages)
-		defer close(binaryMessages)
+		defer close(initialMessage)
+
+		var (
+			hadInitialMessage = false // did we send the initial binary message?
+			hadCancelBefore   = false // did we receive the cancel signal previously?
+		)
 
 		for {
 			select {
 			case msg := <-conn.Read():
+				// send a text message to the client
+				// and ensure that it is never nil
 				if msg.Type == websocket.TextMessage {
-					textMessages <- string(msg.Bytes)
+					if msg.Bytes == nil {
+						msg.Bytes = []byte{}
+					}
+					textMessages <- msg.Bytes
+					continue
 				}
-				if msg.Type == websocket.BinaryMessage {
-					binaryMessages <- msg.Bytes
+
+				// unknown message type received
+				// just ignore it
+				if msg.Type != websocket.BinaryMessage {
+					continue
 				}
+
+				// if we didn't yet have the initial message
+				// send it to the channel
+				if !hadInitialMessage {
+					initialMessage <- msg.Bytes
+					hadInitialMessage = true
+					continue
+				}
+
+				// attempt to decode signal message
+				// and if we fail, cancel with a protocol error
+				var signal proto.SignalMessage
+				if err := json.Unmarshal(msg.Bytes, &signal); err != nil {
+					cancel(proto.ErrCancelProtocolError)
+					continue
+				}
+
+				switch {
+				case signal.Signal == proto.SignalClose:
+					// client has requested to close the text messages channel
+					// so send a flag message (nil) to do the closing
+					textMessages <- nil
+
+				case signal.Signal == proto.SignalCancel && !hadCancelBefore:
+					// client canceled for the first time
+					cancel(proto.ErrCancelClientRequest)
+					hadCancelBefore = true
+				case signal.Signal == proto.SignalCancel && hadCancelBefore:
+					// client canceled for the second time
+					// so we also close the input channel
+					textMessages <- nil
+					hadCancelBefore = true
+
+				default:
+					// some unknown signal was sent
+					// this is a protocol error
+					cancel(proto.ErrCancelProtocolError)
+				}
+
 			case <-conn.Context().Done():
+				cancel(proto.ErrCancelClientGone)
 				return
 			}
 		}
-
 	}()
 
 	// read the call message
 	var call proto.CallMessage
 	select {
-	case buffer := <-binaryMessages:
+	case buffer := <-initialMessage:
+
+		// try to read the protocol message.
+		// and if we fail to unmarshal it, fail with a protocol error
 		if err := json.Unmarshal(buffer, &call); err != nil {
-			return errProtocolError
+			return proto.ErrCancelProtocolError
 		}
 
 	case <-time.After(readCallTimeout):
-		return errReadCallTimeout
+		return proto.ErrCancelTimeout
 	}
 
 	// Find the right process
@@ -143,42 +202,26 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 		return err
 	}
 
-	// create a context to be canceled once done
-	ctx, cancel := context.WithCancelCause(conn.Context())
-	defer cancel(proto.ErrCancelClientGone)
-
-	// handle any signal messages
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		var signal proto.SignalMessage
-
-		for binary := range binaryMessages {
-			signal.Signal = ""
-
-			// read the signal message
-			if err := json.Unmarshal(binary, &signal); err != nil {
-				continue
-			}
-
-			// if we got a cancel message, do the cancellation!
-			if signal.Signal == proto.SignalCancel {
-				cancel(proto.ErrCancelClientRequest)
-			}
-		}
-	}()
-
 	// create a pipe to handle the input
-	// and start handling it
-	var inputR, inputW = io.Pipe()
-	defer inputW.Close()
+	reader, writer := io.Pipe()
+	defer writer.Close()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
 		for text := range textMessages {
-			inputW.Write([]byte(text))
+			if text == nil {
+				goto nomore
+			}
+			writer.Write(text)
+		}
+
+	nomore:
+		writer.Close()
+
+		// drain channel
+		for range textMessages {
 		}
 	}()
 
@@ -190,7 +233,7 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 	})
 
 	// do the actual processing
-	return process.Do(ctx, inputR, output, call.Params...)
+	return process.Do(ctx, reader, output, call.Params...)
 }
 
 // WriterFunc implements io.Writer using a function.

@@ -1,9 +1,11 @@
 import Call from '../../websocket';
 
 
-const call = new Call({ url: "ws://localhost:3000" }, { call: 'tick', params: []});
+const call = new Call({ url: "ws://localhost:3000" }, { call: 'echo', params: []});
 call.onLogLine = console.log
 call.onConnect = function() {
-    setTimeout(() => this.cancel(), 10 * 1000);
+    this.sendText('hello')
+    this.sendText('world')
+    this.closeInput()
 }
 call.connect().then(console.info).catch(console.error)

@@ -53,9 +53,12 @@ var (
 	ErrCancelClientGone = errors.New("client has gone away")
 
 	// CancelClientRequest indicates that the client has explicitly requested cancellation.
-	ErrCancelClientRequest = errors.New("client has requested cancellation")
+	ErrCancelClientRequest = errors.New("client requested cancellation")
+
+	// ErrCancelProtocolError indicates that a protocol error occurred and the process should be cancelled for safety reasons.
+	ErrCancelProtocolError = errors.New("protocol error occured")
 
 	// CancelTimeout indicates that a process timeout has occurred.
 	// This must have been requested by the client at an explicit time.
-	ErrCancelTimeout = errors.New("timeout has expired")
+	ErrCancelTimeout = errors.New("timeout expired")
 )

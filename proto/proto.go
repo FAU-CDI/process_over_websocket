@@ -19,8 +19,9 @@ const (
 	SignalClose  Signal = "close"
 )
 
-// ResultMessage is sent by the server to the client to report the success of a remote procedure
-type ResultMessage struct {
-	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
-}
+// Subprotocol is the mandatory subprotocol to be used by the websocket client.
+const Subprotocol = "pow-1"
+const MessageWrongSubprotocol = "only support subprotocol 'pow-1'"
+
+// CloseReasonFailed is the code with which the websocket is closed if an error occurs.
+const CloseReasonFailed = 3000

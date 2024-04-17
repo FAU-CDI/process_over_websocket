@@ -1,2 +1,5 @@
 node_modules
 yarn-error.log
+
+go.work
+go.work.sum

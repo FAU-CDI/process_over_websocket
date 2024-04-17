@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -19,24 +20,9 @@ var (
 	readCallTimeout = time.Second // timeout for reading the call parameters
 )
 
-var (
-	errUnknownSubprotocol = errors.New("unknown subprotocol")
-	msgUnknownSubprotocol = websocket.NewTextMessage(errUnknownSubprotocol.Error()).MustPrepare()
-)
+var errUnknownSubprotocol = errors.New(proto.MessageWrongSubprotocol)
 
-// checkSubprotocol checks that the connection specifies the right subprotocol
-// TODO: Enforce one here
-func checkSubprotocol(conn *websocket.Connection) error {
-	if conn.Subprotocol() != "" {
-		<-conn.WritePrepared(msgUnknownSubprotocol)
-		return errUnknownSubprotocol
-	}
-
-	return nil
-}
-
-// Serve implements the websocket version 1 of the protocol.
-// It is frozen and should not be changed.
+// Serve implements the websocket protocol.
 //
 // There are two kinds of messages:
 //
@@ -46,11 +32,18 @@ func checkSubprotocol(conn *websocket.Connection) error {
 // To call an action, a client should send a [proto.CallMessage] struct.
 // The server will then start handling input and output (via text messages).
 // If the client sends a [proto.SignalMessage], the signal is propagated to the underlying context.
-// Finally it will send a [proto.ResultMessage] once handling is complete.
+//
+// If the process suceeds, the server closes the websocket with the normal close message.
+// If the process returns an error, the server closes the websocket with [proto.CloseReasonFailed] and an appropriate description of the error.
 func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
-	// check that the right subprotocol is set, or bail out
-	if err := checkSubprotocol(conn); err != nil {
-		return err
+	go func() {
+		ctx := conn.Context()
+		<-ctx.Done()
+	}()
+	// check that the client specified the correct subprotocol.
+	if conn.Subprotocol() != proto.Subprotocol {
+		conn.CloseWith(websocket.ClosePolicyViolation, proto.MessageWrongSubprotocol)
+		return errUnknownSubprotocol
 	}
 
 	var wg sync.WaitGroup
@@ -59,38 +52,17 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 	defer func() {
 		// close the underlying connection, and then wait for everything to finish!
 		defer wg.Wait()
-		defer conn.Close()
 
 		// recover from any errors
 		if e := recovery.Recover(recover()); e != nil {
 			err = e
 		}
 
-		// generate a result message
-		var result proto.ResultMessage
 		if err == nil {
-			result.Success = true
+			conn.CloseWith(websocket.CloseNormalClosure, "")
 		} else {
-			result.Success = false
-			result.Message = err.Error()
-			if result.Message == "" {
-				result.Message = "unspecified error"
-			}
+			conn.CloseWith(proto.CloseReasonFailed, fmt.Sprint(err))
 		}
-
-		// encode the result message to json!
-		var message websocket.Message
-		message.Type = websocket.BinaryMessage
-		message.Bytes, err = json.Marshal(result)
-
-		// silently fail if the message fails to encode
-		// although this should not happen
-		if err != nil {
-			return
-		}
-
-		// and tell the client about it!
-		<-conn.Write(message)
 	}()
 
 	// create a channel for all future text messages

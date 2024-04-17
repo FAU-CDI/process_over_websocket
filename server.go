@@ -25,6 +25,9 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (server *Server) newHandler() http.Handler {
 	return &websocket.Server{
 		Context: context.Background(),
+		Options: websocket.Options{
+			Subprotocols: []string{proto.Subprotocol},
+		},
 
 		// implement the websocket and the handler itself
 		Handler:  server.serveWS,

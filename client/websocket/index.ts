@@ -3,6 +3,8 @@
 import WebSocket from 'isomorphic-ws'
 import { Buffer } from 'buffer'
 
+const EXIT_STATUS_NORMAL_CLOSE = 1000;
+
 /** Call represents a specific WebSocket call */
 export default class Call {
   constructor (remote: Remote, spec: CallSpec) {
@@ -46,18 +48,18 @@ export default class Call {
     this.connected = true
 
     // and do the connection!
-    return await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       // create the websocket
-      const ws = new WebSocket(this.remote.url, typeof this.remote.token === 'string' ? { headers: { Authorization: 'Bearer ' + this.remote.token } } : undefined)
-      this.ws = ws // make it available to other things
-
-      // result is a promise, because some APIs in the browser are async
-      let result = Promise.resolve(JSON.stringify({ success: false, message: 'unknown (client side) error' }))
+      const ws = new WebSocket(this.remote.url, 'pow-1', typeof this.remote.token === 'string' ? { headers: { Authorization: 'Bearer ' + this.remote.token } } : undefined)
+      this.ws = ws // make it available to other thing
 
       ws.onopen = () => {
+        this._closeStateHack();
+
         if (this.beforeCall != null) {
           this.beforeCall()
         }
+
         ws.send(Buffer.from(JSON.stringify(this.call), 'utf8'))
 
         if (this.onConnect != null) {
@@ -65,22 +67,17 @@ export default class Call {
         }
       }
 
-      ws.onmessage = ({ data }: { data: unknown }) => {
-        // if this is a string it is a log line
-        if (typeof data === 'string') {
-          if (this.onLogLine != null) {
-            this.onLogLine(data)
-          }
+      ws.onmessage = ({ data, ...rest }: { data: unknown }) => {
+        // ignore non-strings for now
+        if (typeof data !== 'string') {
+          // TODO: protocol error
           return
         }
 
-        // decode the message
-        if (data instanceof Blob) {
-          result = data.text()
-        } else {
-          const decoder = new TextDecoder()
-          result = Promise.resolve(decoder.decode(data as ArrayBuffer))
+        if (this.onLogLine != null) {
+          this.onLogLine(data)
         }
+        return
       }
 
       ws.onerror = (err: unknown) => {
@@ -93,20 +90,50 @@ export default class Call {
         reject(err)
       }
 
-      ws.onclose = () => {
-        // decode the result
-        result
-          .then(t => JSON.parse(t))
-          .then((res) => {
-            if (this.afterCall != null) {
-              this.afterCall(res)
-            }
-            resolve(res)
-          })
-          .catch((e) => console.error(e))
-          .finally(() => this.close() )
+      ws.onclose = (event: { code: number; reason: string; wasClean: boolean}) => {
+        // normal close => process succeeded
+        if (event.code === EXIT_STATUS_NORMAL_CLOSE) {
+          resolve({ success: true });
+          return;
+        } 
+
+        // abnormal close
+        resolve({ success: false, code: event.code, message: event.reason });
+        
+        this.close();
+      };
+    });
+  }
+
+  /**
+   * Sometimes for unknown reasons the websocket gets stuck in CLOSING state.
+   * 
+   * This code triggers code to manually unstick the server
+   */
+  private _closeStateHack() {
+    const STATE_POLL_INTERVAL = 100;  // how often to poll the state
+    const CLOSE_TIMEOUT = 500;        // how long to wait for the close to finish on it's own 
+
+    const poller = setInterval(() => {
+      // if we have an open or connecting websocket keep going
+      const ws = this.ws;
+      if (ws !== null && (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING)) {
+        return;
       }
-    })
+
+      // clear the interval and only continue if in CLOSING state
+      clearInterval(poller);
+      if (ws === null || ws.readyState !== ws.CLOSING) {
+        return
+      }
+
+      setTimeout(() => {
+        if (ws.readyState === ws.CLOSING) {
+          console.warn('websocket client misbehaved: still in closing state')
+          ws.terminate();
+        }
+      }, CLOSE_TIMEOUT);
+    }, STATE_POLL_INTERVAL);
   }
 
   /** sendText sends some text to the server requests cancellation of an ongoing operation */
@@ -167,7 +194,13 @@ export interface CallSpec {
 }
 
 /** the result of a websocket call */
-export interface Result {
-  success: boolean
+export type Result = ResultSuccess | ResultFailure
+interface ResultSuccess {
+  success: true
+}
+
+interface ResultFailure {
+  success: false
+  code: number
   message: string
 }

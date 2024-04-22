@@ -92,6 +92,12 @@ export default class Call {
       }
 
       ws.onclose = (event: { code: number; reason: string; wasClean: boolean}) => {
+        // if the connection was not clean, reject with an error
+        if (!event.wasClean) {
+          reject(new Error('unclean exit with code ' + event.code + ' ' + event.reason));
+          return;
+        }
+
         // normal close => process succeeded
         if (event.code !== EXIT_STATUS_NORMAL_CLOSE) {
           resolve({ success: false, data: event.reason });

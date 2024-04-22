@@ -12,9 +12,23 @@ import (
 // Server implements process_over_websocket protocol.
 type Server struct {
 	Handler proto.Handler
+	Options Options
 
 	handler lazy.Lazy[http.Handler]
 }
+
+type Options struct {
+	// DisableWebsocket can be set to entirely disable websocket handling.
+	DisableWebsocket bool
+	WebsocketOptions websocketx.Options
+
+	// DisableREST can be set to entirely disable REST access.
+	DisableREST bool
+	RESTOptions RESTOptions
+}
+
+// RESTOptions are options for the rest impl
+type RESTOptions struct{}
 
 // ServeHTTP serves a request
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -22,23 +36,34 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (server *Server) newHandler() http.Handler {
-	ws_server := &websocketx.Server{
-		Options: websocketx.Options{
-			Subprotocols: []string{proto.Subprotocol},
-		},
-
-		// implement the websocket and the handler itself
-		Handler:  server.serveWS,
-		Fallback: http.HandlerFunc(server.serveHTTP),
+	// if neither rest, nor websocket are enabled, server nothing
+	if server.Options.DisableREST && server.Options.DisableWebsocket {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "Not found", http.StatusNotFound)
+		})
 	}
-	ws_server.RequireProtocols()
-	return ws_server
+
+	// generate a rest handler, or leave it at nil
+	var rest http.Handler
+	if !server.Options.DisableREST {
+		rest = server.newRestHandler()
+	}
+
+	// if websocket was disabled, return only rest
+	if server.Options.DisableWebsocket {
+		return rest
+	}
+
+	// requested a websocket handler
+	return server.newWSHandler(rest)
 }
 
-func (server *Server) serveWS(conn *websocketx.Connection) {
-	ws_impl.Serve(server.Handler, conn)
+func (server *Server) newWSHandler(fallback http.Handler) http.Handler {
+	return ws_impl.NewServer(server.Handler, fallback, server.Options.WebsocketOptions)
 }
 
-func (server *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+func (server *Server) newRestHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Not Implemented", http.StatusNotImplemented)
+	})
 }

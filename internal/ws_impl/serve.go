@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
 	"sync"
 	"time"
 
@@ -18,7 +19,28 @@ var (
 	readCallTimeout = time.Second // timeout for reading the call parameters
 )
 
-// Serve implements the websocket protocol.
+// NewServer creates a new server to handle websocket connections.
+func NewServer(handler proto.Handler, fallback http.Handler, options websocketx.Options) *Server {
+	server := &Server{
+		server: websocketx.Server{
+			Options:  options,
+			Fallback: fallback,
+		},
+		handler: handler,
+	}
+
+	// setup the handler for the server
+	server.server.Handler = server.handle
+
+	// set up the subprotocols
+	server.server.Options.Subprotocols = []string{proto.Subprotocol}
+	server.server.RequireProtocols()
+
+	// return the server
+	return server
+}
+
+// Server implements the websocket protocol.
 //
 // There are two kinds of messages:
 //
@@ -31,7 +53,21 @@ var (
 //
 // If nothing unexpected happens (e.g. an abnormal closure from the client), the server will send a
 // [proto.ResultMessage] to the client.
-func Serve(handler proto.Handler, conn *websocketx.Connection) (res any, err error) {
+type Server struct {
+	server  websocketx.Server
+	handler proto.Handler
+}
+
+// ServeHTTP implements handling the protocol
+func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	server.server.ServeHTTP(w, r)
+}
+
+func (server *Server) handle(conn *websocketx.Connection) {
+	_, _ = server.serve(conn)
+}
+
+func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 	// check that the client specified the correct subprotocol.
 	if conn.Subprotocol() != proto.Subprotocol {
 		panic("server did not enforce subprotocol")
@@ -164,7 +200,7 @@ func Serve(handler proto.Handler, conn *websocketx.Connection) (res any, err err
 	}
 
 	// Find the right process
-	process, err := handler.Get(conn.Request(), call.Call, call.Params...)
+	process, err := server.handler.Get(conn.Request(), call.Call, call.Params...)
 	if err != nil {
 		return nil, err
 	}

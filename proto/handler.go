@@ -56,7 +56,7 @@ var (
 	ErrCancelClientRequest = errors.New("client requested cancellation")
 
 	// ErrCancelProtocolError indicates that a protocol error occurred and the process should be cancelled for safety reasons.
-	ErrCancelProtocolError = errors.New("protocol error occured")
+	ErrCancelProtocolError = errors.New("protocol error occurred")
 
 	// CancelTimeout indicates that a process timeout has occurred.
 	// This must have been requested by the client at an explicit time.

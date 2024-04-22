@@ -1,6 +1,8 @@
 github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/QY=
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
-github.com/tkw1536/pkglib v0.0.0-20240417153721-ad77c3f73a45 h1:uv/Vm7ByyACYRW/UX1NwMGLMcsnwoseoJ32gGxeLj6E=
-github.com/tkw1536/pkglib v0.0.0-20240417153721-ad77c3f73a45/go.mod h1:lXQyTJrMOV6DkSbCamf7R+12pWjWyPFB9f+foGgOoxk=
+github.com/tkw1536/pkglib v0.0.0-20240422094425-4222b14975b3 h1:gh76iL+levNYM5xarzA8lFH1H0EAqfVpjNnED6zSLPM=
+github.com/tkw1536/pkglib v0.0.0-20240422094425-4222b14975b3/go.mod h1:P/9GGxNGvEZsYShL7bv57UdiHkR0l6AWz1IDMVJGzlY=
+go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
+go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
 golang.org/x/net v0.24.0 h1:1PcaxkF854Fu3+lvBIx5SYn9wRlBzzcnHZSiaFFAb0w=
 golang.org/x/net v0.24.0/go.mod h1:2Q7sJY5mzlzWjKtYUEXSlBWCdyaioyXzRB2RtU8KVE8=

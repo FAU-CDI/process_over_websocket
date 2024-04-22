@@ -1,17 +1,16 @@
-package wsserver
+package ws_impl
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"time"
 
 	"github.com/FAU-CDI/process_over_websocket/proto"
-	"github.com/tkw1536/pkglib/httpx/websocket"
 	"github.com/tkw1536/pkglib/recovery"
+	"github.com/tkw1536/pkglib/websocketx"
 )
 
 var (
@@ -19,8 +18,6 @@ var (
 
 	readCallTimeout = time.Second // timeout for reading the call parameters
 )
-
-var errUnknownSubprotocol = errors.New(proto.MessageWrongSubprotocol)
 
 // Serve implements the websocket protocol.
 //
@@ -33,19 +30,17 @@ var errUnknownSubprotocol = errors.New(proto.MessageWrongSubprotocol)
 // The server will then start handling input and output (via text messages).
 // If the client sends a [proto.SignalMessage], the signal is propagated to the underlying context.
 //
-// If the process suceeds, the server closes the websocket with the normal close message.
-// If the process returns an error, the server closes the websocket with [proto.CloseReasonFailed] and an appropriate description of the error.
-func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
-	go func() {
-		ctx := conn.Context()
-		<-ctx.Done()
-	}()
+// If nothing unexpected happens (e.g. an abnormal closure from the client), the server will send a
+// [proto.ResultMessage] to the client.
+func Serve(handler proto.Handler, conn *websocketx.Connection) (err error) {
 	// check that the client specified the correct subprotocol.
 	if conn.Subprotocol() != proto.Subprotocol {
-		conn.CloseWith(websocket.ClosePolicyViolation, proto.MessageWrongSubprotocol)
-		return errUnknownSubprotocol
+		conn.ShutdownWith(websocketx.CloseFrame{
+			Code:   websocketx.StatusProtocolError,
+			Reason: fmt.Sprint(proto.ErrWrongSubprotocol),
+		})
+		return proto.ErrWrongSubprotocol
 	}
-
 	var wg sync.WaitGroup
 
 	// once we have finished executing send a binary message (indicating success) to the client.
@@ -58,11 +53,15 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 			err = e
 		}
 
+		// assemble the close message
+		// and return it
+		var msg proto.ResultMessage
 		if err == nil {
-			conn.CloseWith(websocket.CloseNormalClosure, "")
+			msg = proto.ResultMessageSuccess(true)
 		} else {
-			conn.CloseWith(proto.CloseReasonFailed, fmt.Sprint(err))
+			msg = proto.ResultMessageFailure(err)
 		}
+		conn.ShutdownWith(msg.Frame())
 	}()
 
 	// create a channel for all future text messages
@@ -94,24 +93,24 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 			case msg := <-conn.Read():
 				// send a text message to the client
 				// and ensure that it is never nil
-				if msg.Type == websocket.TextMessage {
-					if msg.Bytes == nil {
-						msg.Bytes = []byte{}
+				if msg.Text() {
+					if msg.Body == nil {
+						msg.Body = []byte{}
 					}
-					textMessages <- msg.Bytes
+					textMessages <- msg.Body
 					continue
 				}
 
 				// unknown message type received
 				// just ignore it
-				if msg.Type != websocket.BinaryMessage {
+				if !msg.Binary() {
 					continue
 				}
 
 				// if we didn't yet have the initial message
 				// send it to the channel
 				if !hadInitialMessage {
-					initialMessage <- msg.Bytes
+					initialMessage <- msg.Body
 					hadInitialMessage = true
 					continue
 				}
@@ -119,7 +118,7 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 				// attempt to decode signal message
 				// and if we fail, cancel with a protocol error
 				var signal proto.SignalMessage
-				if err := json.Unmarshal(msg.Bytes, &signal); err != nil {
+				if err := json.Unmarshal(msg.Body, &signal); err != nil {
 					cancel(proto.ErrCancelProtocolError)
 					continue
 				}
@@ -184,12 +183,12 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 
 		for text := range textMessages {
 			if text == nil {
-				goto nomore
+				goto no_more
 			}
 			writer.Write(text)
 		}
 
-	nomore:
+	no_more:
 		writer.Close()
 
 		// drain channel
@@ -198,9 +197,9 @@ func Serve(handler proto.Handler, conn *websocket.Connection) (err error) {
 	}()
 
 	// write the output to the client as it comes in!
-	// NOTE(twiesing): We may eventually need buffering here ...
+	// TODO: We may eventually need buffering here ...
 	output := WriterFunc(func(b []byte) (int, error) {
-		<-conn.WriteText(string(b))
+		conn.WriteText(string(b))
 		return len(b), nil
 	})
 

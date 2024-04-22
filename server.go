@@ -1,13 +1,12 @@
 package process_over_websocket
 
 import (
-	"context"
 	"net/http"
 
-	"github.com/FAU-CDI/process_over_websocket/internal/wsserver"
+	"github.com/FAU-CDI/process_over_websocket/internal/ws_impl"
 	"github.com/FAU-CDI/process_over_websocket/proto"
-	"github.com/tkw1536/pkglib/httpx/websocket"
 	"github.com/tkw1536/pkglib/lazy"
+	"github.com/tkw1536/pkglib/websocketx"
 )
 
 // Server implements process_over_websocket protocol.
@@ -23,9 +22,8 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (server *Server) newHandler() http.Handler {
-	return &websocket.Server{
-		Context: context.Background(),
-		Options: websocket.Options{
+	return &websocketx.Server{
+		Options: websocketx.Options{
 			Subprotocols: []string{proto.Subprotocol},
 		},
 
@@ -35,8 +33,8 @@ func (server *Server) newHandler() http.Handler {
 	}
 }
 
-func (server *Server) serveWS(conn *websocket.Connection) {
-	wsserver.Serve(server.Handler, conn)
+func (server *Server) serveWS(conn *websocketx.Connection) {
+	ws_impl.Serve(server.Handler, conn)
 }
 
 func (server *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {

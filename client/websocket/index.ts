@@ -4,6 +4,7 @@ import WebSocket from 'isomorphic-ws'
 import { Buffer } from 'buffer'
 
 const EXIT_STATUS_NORMAL_CLOSE = 1000;
+const PROTOCOL = 'pow-unsupported';
 
 /** Call represents a specific WebSocket call */
 export default class Call {
@@ -50,7 +51,7 @@ export default class Call {
     // and do the connection!
     return new Promise((resolve, reject) => {
       // create the websocket
-      const ws = new WebSocket(this.remote.url, 'pow-1', typeof this.remote.token === 'string' ? { headers: { Authorization: 'Bearer ' + this.remote.token } } : undefined)
+      const ws = new WebSocket(this.remote.url, PROTOCOL, typeof this.remote.token === 'string' ? { headers: { Authorization: 'Bearer ' + this.remote.token } } : undefined)
       this.ws = ws // make it available to other thing
 
       ws.onopen = () => {
@@ -92,13 +93,42 @@ export default class Call {
 
       ws.onclose = (event: { code: number; reason: string; wasClean: boolean}) => {
         // normal close => process succeeded
-        if (event.code === EXIT_STATUS_NORMAL_CLOSE) {
-          resolve({ success: true });
+        if (event.code !== EXIT_STATUS_NORMAL_CLOSE) {
+          resolve({ success: false, data: event.reason });
           return;
         } 
+        
+        let reason: unknown
+        try {
+          console.log("reason is", event.reason);
+          reason = JSON.parse(event.reason)
+        } catch (e: unknown) {
+          resolve({ success: false, data: "protocol error: unable to parse reason field"})
+          return; 
+        }
 
-        // abnormal close
-        resolve({ success: false, code: event.code, message: event.reason });
+        if (typeof reason !== 'object' || !reason) {
+          resolve({ success: false, data: "protocol error: reason field is not an object"});
+          return;
+        }
+
+        const { success, data } = reason as any;
+        
+        if (typeof success !== 'boolean') {
+          resolve({ success: false, data: "protocol error: success field not a boolean"});
+          return;
+        }
+
+        if (success === false) {
+          if (typeof data !== 'string') {
+            resolve({ success: false, data: "protocol error: data field does not contain a message"});
+            return;
+          }
+
+          resolve({ success: false, data: data })
+          return;
+        } 
+        resolve({ success: true, data: data });
         
         this.close();
       };
@@ -197,10 +227,10 @@ export interface CallSpec {
 export type Result = ResultSuccess | ResultFailure
 interface ResultSuccess {
   success: true
+  data: unknown
 }
 
 interface ResultFailure {
   success: false
-  code: number
-  message: string
+  data: string // error message (if any)
 }

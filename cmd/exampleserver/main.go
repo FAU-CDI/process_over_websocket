@@ -19,19 +19,16 @@ func main() {
 		if name != "echo" {
 			return nil, proto.ErrHandlerUnknownProcess
 		}
-		if len(args) != 0 {
-			return nil, proto.ErrHandlerInvalidArgs
-		}
 
 		// return the error handler
-		return proto.ProcessFunc(func(ctx context.Context, input io.Reader, output io.Writer, args ...string) error {
+		return proto.ProcessFunc(func(ctx context.Context, input io.Reader, output io.Writer, args ...string) (any, error) {
 			// log that we are doing something
 			log.Println("starting new process")
 			defer log.Println("process exited")
 
 			// copy over the content
 			io.Copy(output, input)
-			return context.Cause(ctx)
+			return args, context.Cause(ctx)
 		}), nil
 	})
 

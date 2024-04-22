@@ -22,7 +22,7 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (server *Server) newHandler() http.Handler {
-	return &websocketx.Server{
+	ws_server := &websocketx.Server{
 		Options: websocketx.Options{
 			Subprotocols: []string{proto.Subprotocol},
 		},
@@ -31,6 +31,8 @@ func (server *Server) newHandler() http.Handler {
 		Handler:  server.serveWS,
 		Fallback: http.HandlerFunc(server.serveHTTP),
 	}
+	ws_server.RequireProtocols()
+	return ws_server
 }
 
 func (server *Server) serveWS(conn *websocketx.Connection) {

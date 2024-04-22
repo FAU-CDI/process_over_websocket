@@ -1,7 +1,7 @@
 import Call from '../../websocket';
 
 
-const call = new Call({ url: "ws://localhost:3000" }, { call: 'echo', params: []});
+const call = new Call({ url: "ws://localhost:3000" }, { call: 'echo', params: ['random', 'params']});
 call.onLogLine = console.log
 call.onConnect = function() {
     this.sendText('hello')

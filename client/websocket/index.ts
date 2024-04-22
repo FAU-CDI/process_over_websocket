@@ -4,7 +4,7 @@ import WebSocket from 'isomorphic-ws'
 import { Buffer } from 'buffer'
 
 const EXIT_STATUS_NORMAL_CLOSE = 1000;
-const PROTOCOL = 'pow-unsupported';
+const PROTOCOL = 'pow-1';
 
 /** Call represents a specific WebSocket call */
 export default class Call {
@@ -100,7 +100,6 @@ export default class Call {
         
         let reason: unknown
         try {
-          console.log("reason is", event.reason);
           reason = JSON.parse(event.reason)
         } catch (e: unknown) {
           resolve({ success: false, data: "protocol error: unable to parse reason field"})

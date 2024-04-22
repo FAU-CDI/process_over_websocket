@@ -37,13 +37,13 @@ type Process interface {
 	//
 	// The context is cancelled once the client is no longer available.
 	// It's CancelCause is one of the special ErrCancel* constants in this package.
-	Do(ctx context.Context, input io.Reader, output io.Writer, args ...string) error
+	Do(ctx context.Context, input io.Reader, output io.Writer, args ...string) (any, error)
 }
 
 // ProcessFunc implements Process
-type ProcessFunc func(ctx context.Context, input io.Reader, output io.Writer, args ...string) error
+type ProcessFunc func(ctx context.Context, input io.Reader, output io.Writer, args ...string) (any, error)
 
-func (pf ProcessFunc) Do(ctx context.Context, input io.Reader, output io.Writer, args ...string) error {
+func (pf ProcessFunc) Do(ctx context.Context, input io.Reader, output io.Writer, args ...string) (any, error) {
 	return pf(ctx, input, output, args...)
 }
 

@@ -3,7 +3,6 @@ package ws_impl
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -32,15 +31,12 @@ var (
 //
 // If nothing unexpected happens (e.g. an abnormal closure from the client), the server will send a
 // [proto.ResultMessage] to the client.
-func Serve(handler proto.Handler, conn *websocketx.Connection) (err error) {
+func Serve(handler proto.Handler, conn *websocketx.Connection) (res any, err error) {
 	// check that the client specified the correct subprotocol.
 	if conn.Subprotocol() != proto.Subprotocol {
-		conn.ShutdownWith(websocketx.CloseFrame{
-			Code:   websocketx.StatusProtocolError,
-			Reason: fmt.Sprint(proto.ErrWrongSubprotocol),
-		})
-		return proto.ErrWrongSubprotocol
+		panic("server did not enforce subprotocol")
 	}
+
 	var wg sync.WaitGroup
 
 	// once we have finished executing send a binary message (indicating success) to the client.
@@ -57,7 +53,7 @@ func Serve(handler proto.Handler, conn *websocketx.Connection) (err error) {
 		// and return it
 		var msg proto.ResultMessage
 		if err == nil {
-			msg = proto.ResultMessageSuccess(true)
+			msg = proto.ResultMessageSuccess(res)
 		} else {
 			msg = proto.ResultMessageFailure(err)
 		}
@@ -160,17 +156,17 @@ func Serve(handler proto.Handler, conn *websocketx.Connection) (err error) {
 		// try to read the protocol message.
 		// and if we fail to unmarshal it, fail with a protocol error
 		if err := json.Unmarshal(buffer, &call); err != nil {
-			return proto.ErrCancelProtocolError
+			return nil, proto.ErrCancelProtocolError
 		}
 
 	case <-time.After(readCallTimeout):
-		return proto.ErrCancelTimeout
+		return nil, proto.ErrCancelTimeout
 	}
 
 	// Find the right process
 	process, err := handler.Get(conn.Request(), call.Call, call.Params...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// create a pipe to handle the input

@@ -19,8 +19,10 @@ var (
 	readCallTimeout = time.Second // timeout for reading the call parameters
 )
 
+type Options = websocketx.Options
+
 // NewServer creates a new server to handle websocket connections.
-func NewServer(handler proto.Handler, fallback http.Handler, options websocketx.Options) *Server {
+func NewServer(handler proto.Handler, fallback http.Handler, options Options) *Server {
 	server := &Server{
 		server: websocketx.Server{
 			Options:  options,
@@ -237,6 +239,14 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 
 	// do the actual processing
 	return process.Do(ctx, reader, output, call.Params...)
+}
+
+func (server *Server) Close() {
+	server.server.Close()
+}
+
+func (server *Server) Shutdown() {
+	server.server.Shutdown()
 }
 
 // WriterFunc implements io.Writer using a function.

@@ -2,10 +2,11 @@ package process_over_websocket
 
 import (
 	"net/http"
+	"sync"
 
+	"github.com/FAU-CDI/process_over_websocket/internal/rest_impl"
 	"github.com/FAU-CDI/process_over_websocket/internal/ws_impl"
 	"github.com/FAU-CDI/process_over_websocket/proto"
-	"github.com/tkw1536/pkglib/lazy"
 	"github.com/tkw1536/pkglib/websocketx"
 )
 
@@ -14,7 +15,10 @@ type Server struct {
 	Handler proto.Handler
 	Options Options
 
-	handler lazy.Lazy[http.Handler]
+	init      sync.Once
+	handler   http.Handler
+	websocket *ws_impl.Server
+	rest      *rest_impl.Server
 }
 
 type Options struct {
@@ -24,46 +28,98 @@ type Options struct {
 
 	// DisableREST can be set to entirely disable REST access.
 	DisableREST bool
-	RESTOptions RESTOptions
+	RESTOptions rest_impl.Options
 }
-
-// RESTOptions are options for the rest impl
-type RESTOptions struct{}
 
 // ServeHTTP serves a request
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	server.handler.Get(server.newHandler).ServeHTTP(w, r)
+	server.doInit()
+	server.handler.ServeHTTP(w, r)
 }
 
-func (server *Server) newHandler() http.Handler {
-	// if neither rest, nor websocket are enabled, server nothing
-	if server.Options.DisableREST && server.Options.DisableWebsocket {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "Not found", http.StatusNotFound)
-		})
-	}
+func (server *Server) doInit() {
+	server.init.Do(func() {
+		server.handler = func() http.Handler {
+			// setup the rest server if requested
+			if !server.Options.DisableREST {
+				server.rest = rest_impl.NewServer(server.Handler, server.Options.RESTOptions)
+			}
 
-	// generate a rest handler, or leave it at nil
-	var rest http.Handler
-	if !server.Options.DisableREST {
-		rest = server.newRestHandler()
-	}
+			// setup the websocket handler if requested
+			if !server.Options.DisableWebsocket {
+				server.websocket = ws_impl.NewServer(server.Handler, server.rest, server.Options.WebsocketOptions)
+			}
 
-	// if websocket was disabled, return only rest
-	if server.Options.DisableWebsocket {
-		return rest
-	}
+			// nothing is enabled =>
+			if server.Options.DisableREST && server.Options.DisableWebsocket {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					http.Error(w, "Not found", http.StatusNotFound)
+				})
+			}
 
-	// requested a websocket handler
-	return server.newWSHandler(rest)
-}
-
-func (server *Server) newWSHandler(fallback http.Handler) http.Handler {
-	return ws_impl.NewServer(server.Handler, fallback, server.Options.WebsocketOptions)
-}
-
-func (server *Server) newRestHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "Not Implemented", http.StatusNotImplemented)
+			// return the right handler
+			if server.Options.DisableWebsocket {
+				return server.rest
+			}
+			return server.websocket
+		}()
 	})
+}
+
+func (server *Server) Close() {
+	server.doInit()
+
+	var wg sync.WaitGroup
+
+	// close the websocket server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if server.websocket == nil {
+			return
+		}
+		server.websocket.Close()
+	}()
+
+	// close the rest server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if server.rest == nil {
+			return
+		}
+		server.rest.Close()
+	}()
+
+	// and be done with it
+	wg.Wait()
+}
+
+func (server *Server) Shutdown() {
+	server.doInit()
+
+	var wg sync.WaitGroup
+
+	// shutdown the websocket server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if server.websocket == nil {
+			return
+		}
+		server.websocket.Shutdown()
+	}()
+
+	// shutdown the rest server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if server.rest == nil {
+			return
+		}
+		server.rest.Shutdown()
+	}()
+
+	// and be done with it
+	wg.Wait()
 }

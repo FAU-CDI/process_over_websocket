@@ -53,7 +53,7 @@ func NewServer(handler proto.Handler, fallback http.Handler, options Options) *S
 // The server will then start handling input and output (via text messages).
 // If the client sends a [proto.SignalMessage], the signal is propagated to the underlying context.
 //
-// If nothing unexpected happens (e.g. an abnormal closure from the client), the server will send a
+// If nothing unexpected happens (e.g. an abnormal closure from the client), the server will close the connection and send a
 // [proto.ResultMessage] to the client.
 type Server struct {
 	server  websocketx.Server

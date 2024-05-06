@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// NewServer creates a new rest server implementation
 func NewServer(handler proto.Handler, options Options) *Server {
 	return &Server{
 		handler: handler,
@@ -14,6 +15,7 @@ func NewServer(handler proto.Handler, options Options) *Server {
 	}
 }
 
+// Options are the options for a rest server
 type Options struct{}
 
 type Server struct {

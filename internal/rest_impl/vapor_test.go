@@ -11,18 +11,18 @@ import (
 	"github.com/FAU-CDI/process_over_websocket/internal/rest_impl"
 )
 
-func TestExpireAble_expire(t *testing.T) {
+func TestVapor_expire(t *testing.T) {
 	closed := make(chan struct{})
 
-	// create an expirable that just records it was closed
-	exp := rest_impl.ExpireAble[CloseFunc]{
+	// create a vapor that just records it was closed
+	vap := rest_impl.Vapor[CloseFunc]{
 		Make: func() CloseFunc {
 			return func() error {
 				close(closed)
 				return nil
 			}
 		},
-		MakeID: func() string {
+		NewID: func() string {
 			return "single-id"
 		},
 	}
@@ -31,13 +31,13 @@ func TestExpireAble_expire(t *testing.T) {
 	timeout := 100 * time.Millisecond
 
 	// create a new element
-	newElem, err := exp.New(timeout)
+	newElem, err := vap.New(timeout)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// get the element
-	if _, err := exp.Get(newElem); err != nil {
+	if _, err := vap.Get(newElem); err != nil {
 		t.Fatal(err)
 	}
 
@@ -49,23 +49,23 @@ func TestExpireAble_expire(t *testing.T) {
 	}
 }
 
-func TestExpireAble_KeepAlive(t *testing.T) {
-	// create an expirable that fails the test if close is called
-	exp := rest_impl.ExpireAble[CloseFunc]{
+func TestVapor_KeepAlive(t *testing.T) {
+	// create a vapor that fails the test if close is called
+	vap := rest_impl.Vapor[CloseFunc]{
 		Make: func() CloseFunc {
 			return func() error {
 				t.Fatal("Close() called unexpectedly")
 				return nil
 			}
 		},
-		MakeID: func() string {
+		NewID: func() string {
 			return "single-id"
 		},
 	}
 
 	timeout := 100 * time.Millisecond
 
-	elem, err := exp.New(timeout)
+	elem, err := vap.New(timeout)
 	if err != nil {
 		panic(err)
 	}
@@ -74,21 +74,22 @@ func TestExpireAble_KeepAlive(t *testing.T) {
 	// so it doesn't expire
 	for range 10 {
 		time.Sleep(timeout / 2)
-		exp.Get(elem)
+		vap.Get(elem)
 	}
 }
 
-func TestExpireAble_Close(t *testing.T) {
+func TestVapor_Close(t *testing.T) {
 	closes := make(chan struct{})
+
 	var ids atomic.Int64 // holds the current numeric id
-	exp := rest_impl.ExpireAble[CloseFunc]{
+	vap := rest_impl.Vapor[CloseFunc]{
 		Make: func() CloseFunc {
 			return func() error {
 				closes <- struct{}{}
 				return nil
 			}
 		},
-		MakeID: func() string {
+		NewID: func() string {
 			// automatically generate different ids
 			return strconv.FormatInt(ids.Add(1), 10)
 		},
@@ -98,7 +99,7 @@ func TestExpireAble_Close(t *testing.T) {
 
 	// create N new elements which expire after a long time
 	for range N {
-		_, err := exp.New(time.Hour)
+		_, err := vap.New(time.Hour)
 		if err != nil {
 			t.Fatalf("failed to create: %v", err)
 		}
@@ -115,7 +116,7 @@ func TestExpireAble_Close(t *testing.T) {
 	}()
 
 	// cause all the closes to be called
-	exp.Close()
+	vap.Close()
 
 	select {
 	case <-time.After(time.Second):

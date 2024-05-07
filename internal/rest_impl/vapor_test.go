@@ -16,12 +16,13 @@ func TestVapor_expire(t *testing.T) {
 
 	// create a vapor that just records it was closed
 	vap := rest_impl.Vapor[CloseFunc]{
-		Make: func() CloseFunc {
-			return func() error {
+		Initialize: func(f *CloseFunc) {
+			*f = func() error {
 				close(closed)
 				return nil
 			}
 		},
+		Finalize: func(cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			return "single-id"
 		},
@@ -52,12 +53,13 @@ func TestVapor_expire(t *testing.T) {
 func TestVapor_KeepAlive(t *testing.T) {
 	// create a vapor that fails the test if close is called
 	vap := rest_impl.Vapor[CloseFunc]{
-		Make: func() CloseFunc {
-			return func() error {
+		Initialize: func(cf *CloseFunc) {
+			*cf = func() error {
 				t.Fatal("Close() called unexpectedly")
 				return nil
 			}
 		},
+		Finalize: func(cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			return "single-id"
 		},
@@ -83,12 +85,13 @@ func TestVapor_Close(t *testing.T) {
 
 	var ids atomic.Int64 // holds the current numeric id
 	vap := rest_impl.Vapor[CloseFunc]{
-		Make: func() CloseFunc {
-			return func() error {
+		Initialize: func(cf *CloseFunc) {
+			*cf = func() error {
 				closes <- struct{}{}
 				return nil
 			}
 		},
+		Finalize: func(cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			// automatically generate different ids
 			return strconv.FormatInt(ids.Add(1), 10)

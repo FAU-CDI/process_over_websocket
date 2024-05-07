@@ -5,18 +5,45 @@ package rest_impl
 import (
 	"context"
 	"errors"
-	"io"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
-	"github.com/tkw1536/pkglib/lazy"
 )
 
-// Vapor provides concurrent access to objects that can expire
-type Vapor[T io.Closer] struct {
+// Vapor holds elements of type *T.
+//
+// Each element is automatically finalized after a specific duration.
+// This duration can be extended by repeatedly accessing the element.
+type Vapor[T any] struct {
+	// NewID is used to create elements within this vapor.
+	//
+	// IDs should be non-empty, unique strings.
+	// Internal code within the vapor ensures that at any one time no two elements
+	// receive the same ID, even if this function accidentally returns the same id.
+	//
+	// If NewID fails to return a new non-empty, unique id after being called an
+	// unspecified amount of times, an error is returned instead of generating an
+	// id itself.
+	//
+	// NewID might be called concurrently by multiple threads.
 	NewID func() string
-	Make  func() T
+
+	// Initialize is called to initialize a new element upon being created.
+	// The parameter is pointing to pointing to a new zero value of T.
+	//
+	// If Initialize is nil, this function will not be called and new elements will
+	// simply remain the zero value.
+	Initialize func(*T)
+
+	// Finalize is called to finalize an element upon being removed from this vapor.
+	// The parameter is pointing to the value, and is guaranteed to have passed through
+	// the initialize function.
+	//
+	// If Finalize is nil, it is not called.
+	// In this case Initialize may not be called on items that are evicted prior to being used.
+	Finalize func(*T)
 
 	init sync.Once
 
@@ -26,20 +53,37 @@ type Vapor[T io.Closer] struct {
 	cache *ttlcache.Cache[string, *entry[T]] // holds the actual items
 }
 
-type entry[T io.Closer] struct {
-	value lazy.Lazy[T]
+// entry holds information about a single item
+type entry[T any] struct {
+	init  sync.Once
+	value T
 }
+
+// maximum number of times NewID is called before producing an error.
+const maxNewIDCalls = 1000
+
+var (
+	errNoID     = fmt.Errorf("Vapor: MakeID did not produce a new unique id after being called %d times", maxNewIDCalls)
+	errNewIDNil = errors.New("Vapor: MakeID is nil")
+)
 
 // newEntry creates a new entry within the underlying cache and returns it
 func (vap *Vapor[T]) newEntry(d time.Duration) (string, *ttlcache.Item[string, *entry[T]], error) {
 	vap.start()
 
+	if vap.NewID == nil {
+		return "", nil, errNewIDNil
+	}
+
 	for range maxNewIDCalls {
+		// create a new id
 		id := vap.NewID()
-		if id == "" { // an empty id is invalid
+		if id == "" {
+			// that must not be empty
 			continue
 		}
 
+		// check if we have the element already
 		entry, found := vap.cache.GetOrSet(id, &entry[T]{}, ttlcache.WithTTL[string, *entry[T]](d), ttlcache.WithDisableTouchOnHit[string, *entry[T]]())
 		if found {
 			continue
@@ -50,8 +94,14 @@ func (vap *Vapor[T]) newEntry(d time.Duration) (string, *ttlcache.Item[string, *
 }
 
 // initItem initializes the given item, returning the actual value
-func (vap *Vapor[T]) initItem(item *ttlcache.Item[string, *entry[T]]) T {
-	return item.Value().value.Get(vap.Make)
+func (vap *Vapor[T]) initItem(item *ttlcache.Item[string, *entry[T]]) *T {
+	entry := item.Value()
+	entry.init.Do(func() {
+		if vap.Initialize != nil {
+			vap.Initialize(&entry.value)
+		}
+	})
+	return &entry.value
 }
 
 // vap ensures that the vapor is in started state
@@ -60,7 +110,10 @@ func (vap *Vapor[T]) start() {
 		// create a new cache which closes items on eviction
 		vap.cache = ttlcache.New[string, *entry[T]]()
 		vap.cache.OnEviction(func(ctx context.Context, er ttlcache.EvictionReason, i *ttlcache.Item[string, *entry[T]]) {
-			vap.initItem(i).Close()
+			if vap.Finalize == nil {
+				return
+			}
+			vap.Finalize(vap.initItem(i))
 		})
 	})
 
@@ -90,10 +143,6 @@ func (vap *Vapor[T]) stop() {
 	vap.started = false
 }
 
-const maxNewIDCalls = 10_000
-
-var errNoID = errors.New("MakeID did not produce a sufficiently unique ID")
-
 // New reserves space for a new element within this vapor, and returns the id of the new element.
 // The element is automatically removed from this vapor after time d.
 //
@@ -104,11 +153,10 @@ func (vap *Vapor[T]) New(d time.Duration) (string, error) {
 }
 
 // GetNew is like a call to New, followed by a call to Get with the returned id.
-func (exp *Vapor[T]) GetNew(d time.Duration) (T, error) {
+func (exp *Vapor[T]) GetNew(d time.Duration) (*T, error) {
 	_, entry, err := exp.newEntry(d)
 	if err != nil {
-		var zero T
-		return zero, err
+		return nil, err
 	}
 
 	return exp.initItem(entry), nil
@@ -118,20 +166,20 @@ var errNotFound = errors.New("Get: ID not found (is it expired?)")
 
 // Get returns the element with the given id from the vapor.
 // It extends the duration until element expires by it's respective duration.
-func (exp *Vapor[T]) Get(id string) (T, error) {
+func (exp *Vapor[T]) Get(id string) (*T, error) {
 	exp.start()
 
 	item := exp.cache.Get(id)
 	if item == nil {
-		var zero T
-		return zero, errNotFound
+		return nil, errNotFound
 	}
 
 	return exp.initItem(item), nil
 }
 
-// Expire expires the given item with the provided id.
-func (vap *Vapor[T]) Expire(id string) {
+// Evict removes the item with the given id.
+// If the item does not exist, this method has no effect.
+func (vap *Vapor[T]) Evict(id string) {
 	vap.start()
 
 	vap.cache.Delete(id)

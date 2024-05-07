@@ -1,5 +1,7 @@
+//spellchecker:words process over websocket
 package process_over_websocket
 
+//spellchecker:words http sync github process over websocket internal rest impl proto pkglib websocketx
 import (
 	"net/http"
 	"sync"

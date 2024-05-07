@@ -1,5 +1,7 @@
+//spellchecker:words rest impl
 package rest_impl
 
+//spellchecker:words http github process over websocket proto gorilla
 import (
 	"net/http"
 

@@ -1,5 +1,7 @@
+//spellchecker:words rest impl
 package rest_impl_test
 
+//spellchecker:words strconv sync github process over websocket internal rest impl
 import (
 	"fmt"
 	"strconv"

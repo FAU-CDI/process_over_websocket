@@ -1,5 +1,7 @@
+//spellchecker:words proto
 package proto
 
+//spellchecker:words context errors http
 import (
 	"context"
 	"errors"

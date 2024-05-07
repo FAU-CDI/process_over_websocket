@@ -1,5 +1,7 @@
+//spellchecker:words rest impl
 package rest_impl_test
 
+//spellchecker:words strconv sync atomic testing time github process over websocket internal rest impl
 import (
 	"strconv"
 	"sync/atomic"

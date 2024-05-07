@@ -1,5 +1,7 @@
+//spellchecker:words main
 package main
 
+//spellchecker:words context http signal github process over websocket proto
 import (
 	"context"
 	"io"

@@ -1,6 +1,9 @@
 // Package proto holds structs used by the protocol.
+//
+//spellchecker:words proto
 package proto
 
+//spellchecker:words encoding json github pkglib websocketx
 import (
 	"encoding/json"
 	"fmt"

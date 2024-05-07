@@ -1,5 +1,7 @@
+//spellchecker:words rest impl
 package rest_impl
 
+//spellchecker:words sync github pkglib ringbuffer status
 import (
 	"sync"
 
@@ -7,7 +9,7 @@ import (
 	"github.com/tkw1536/pkglib/status"
 )
 
-// spellchecker:words ringbuffer
+//spellchecker:words ringbuffer
 
 // FiniteBuffer is an [io.Writer] that contains a maximal number of lines.
 // Do not copy a non-zero LineBuffer.

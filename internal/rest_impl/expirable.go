@@ -1,5 +1,7 @@
+//spellchecker:words rest impl
 package rest_impl
 
+//spellchecker:words context errors sync time github jellydator ttlcache pkglib lazy
 import (
 	"context"
 	"errors"

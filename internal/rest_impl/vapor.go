@@ -43,7 +43,7 @@ type Vapor[T any] struct {
 	//
 	// If Finalize is nil, it is not called.
 	// In this case Initialize may not be called on items that are evicted prior to being used.
-	Finalize func(*T)
+	Finalize func(FinalizeReason, *T)
 
 	init sync.Once
 
@@ -52,6 +52,14 @@ type Vapor[T any] struct {
 
 	cache *ttlcache.Cache[string, *entry[T]] // holds the actual items
 }
+
+// FinalizeReason indicates a reason why Finalize was called
+type FinalizeReason uint64
+
+const (
+	FinalizeReasonDeleted FinalizeReason = iota
+	FinalizeReasonExpired
+)
 
 // entry holds information about a single item
 type entry[T any] struct {
@@ -113,7 +121,17 @@ func (vap *Vapor[T]) start() {
 			if vap.Finalize == nil {
 				return
 			}
-			vap.Finalize(vap.initItem(i))
+
+			// determine the reason for eveiction
+			var fr FinalizeReason
+			if er == ttlcache.EvictionReasonDeleted {
+				fr = FinalizeReasonDeleted
+			} else if er == ttlcache.EvictionReasonExpired {
+				fr = FinalizeReasonExpired
+			} else {
+				panic("unknown eviction reason")
+			}
+			vap.Finalize(fr, vap.initItem(i))
 		})
 	})
 

@@ -22,7 +22,7 @@ func TestVapor_expire(t *testing.T) {
 				return nil
 			}
 		},
-		Finalize: func(cf *CloseFunc) { cf.Close() },
+		Finalize: func(fr rest_impl.FinalizeReason, cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			return "single-id"
 		},
@@ -59,7 +59,7 @@ func TestVapor_KeepAlive(t *testing.T) {
 				return nil
 			}
 		},
-		Finalize: func(cf *CloseFunc) { cf.Close() },
+		Finalize: func(fr rest_impl.FinalizeReason, cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			return "single-id"
 		},
@@ -91,7 +91,7 @@ func TestVapor_Close(t *testing.T) {
 				return nil
 			}
 		},
-		Finalize: func(cf *CloseFunc) { cf.Close() },
+		Finalize: func(fr rest_impl.FinalizeReason, cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			// automatically generate different ids
 			return strconv.FormatInt(ids.Add(1), 10)
@@ -130,9 +130,9 @@ func TestVapor_Close(t *testing.T) {
 
 }
 
-// CloseFunc implements io.Closer
+// CloseFunc has a Close Function
 type CloseFunc func() error
 
-func (cf CloseFunc) Close() error {
-	return cf()
+func (cf CloseFunc) Close() {
+	cf()
 }

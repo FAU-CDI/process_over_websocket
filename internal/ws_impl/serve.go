@@ -109,7 +109,7 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 
 	// create a context to be canceled once done
 	ctx, cancel := context.WithCancelCause(conn.Context())
-	defer cancel(proto.ErrCancelClientGone)
+	defer cancel(proto.ErrCancelHandlerReturn)
 
 	// start processing messages
 	wg.Add(1)

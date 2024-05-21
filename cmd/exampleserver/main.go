@@ -40,6 +40,7 @@ func main() {
 
 			// copy over the content
 			io.Copy(output, input)
+
 			return args, context.Cause(ctx)
 		}), nil
 	})

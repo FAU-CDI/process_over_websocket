@@ -1,7 +1,9 @@
-//spellchecker:words rest impl
-package rest_impl
+// Package vapor implements Vapor
+//
+//spellchecker:words vapor
+package vapor
 
-//spellchecker:words context errors sync time github jellydator ttlcache pkglib lazy
+//spellchecker:words context errors sync time github jellydator ttlcache
 import (
 	"context"
 	"errors"
@@ -17,6 +19,9 @@ import (
 // Each element is automatically finalized after a specific duration.
 // This duration can be extended by repeatedly accessing the element.
 type Vapor[T any] struct {
+	stopped  bool
+	stoppedM sync.Mutex
+
 	// NewID is used to create elements within this vapor.
 	//
 	// IDs should be non-empty, unique strings.
@@ -73,6 +78,7 @@ const maxNewIDCalls = 1000
 var (
 	errNoID     = fmt.Errorf("Vapor: MakeID did not produce a new unique id after being called %d times", maxNewIDCalls)
 	errNewIDNil = errors.New("Vapor: MakeID is nil")
+	errStopped  = errors.New("Vapor: No longer accepting new elements")
 )
 
 // newEntry creates a new entry within the underlying cache and returns it
@@ -91,8 +97,16 @@ func (vap *Vapor[T]) newEntry(d time.Duration) (string, *ttlcache.Item[string, *
 			continue
 		}
 
+		// ensure that we still accept new elements
+		vap.stoppedM.Lock()
+		if vap.stopped {
+			vap.stoppedM.Unlock()
+			return "", nil, errStopped
+		}
 		// check if we have the element already
 		entry, found := vap.cache.GetOrSet(id, &entry[T]{}, ttlcache.WithTTL[string, *entry[T]](d), ttlcache.WithDisableTouchOnHit[string, *entry[T]]())
+		vap.stoppedM.Unlock()
+
 		if found {
 			continue
 		}
@@ -122,7 +136,7 @@ func (vap *Vapor[T]) start() {
 				return
 			}
 
-			// determine the reason for eveiction
+			// determine the reason for eviction
 			var fr FinalizeReason
 			if er == ttlcache.EvictionReasonDeleted {
 				fr = FinalizeReasonDeleted
@@ -171,13 +185,13 @@ func (vap *Vapor[T]) New(d time.Duration) (string, error) {
 }
 
 // GetNew is like a call to New, followed by a call to Get with the returned id.
-func (exp *Vapor[T]) GetNew(d time.Duration) (*T, error) {
-	_, entry, err := exp.newEntry(d)
+func (exp *Vapor[T]) GetNew(d time.Duration) (id string, elem *T, err error) {
+	id, entry, err := exp.newEntry(d)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	return exp.initItem(entry), nil
+	return id, exp.initItem(entry), nil
 }
 
 var errNotFound = errors.New("Get: ID not found (is it expired?)")
@@ -201,6 +215,44 @@ func (vap *Vapor[T]) Evict(id string) {
 	vap.start()
 
 	vap.cache.Delete(id)
+}
+
+// EvictAfter calls f for each known item, and then evicts the item.
+// Once a call to EvictAfter is made, no new items may be created.
+func (vap *Vapor[T]) EvictAfter(f func(elem *T)) {
+	vap.start()
+
+	vap.stoppedM.Lock()
+	vap.stopped = true
+	vap.stoppedM.Unlock()
+
+	// evict all the elements
+	keys := vap.cache.Keys()
+
+	var wg sync.WaitGroup
+	wg.Add(len(keys))
+	for _, k := range keys {
+		go func() {
+			defer wg.Done()
+
+			// get the item (if it still exists)
+			item := vap.cache.Get(k, ttlcache.WithDisableTouchOnHit[string, *entry[T]]())
+			if item == nil {
+				return
+			}
+			// delete the item once done
+			defer vap.cache.Delete(k)
+
+			// call the function
+			if f == nil {
+				return
+			}
+			f(vap.initItem(item))
+		}()
+	}
+
+	wg.Wait()
+	vap.cache.DeleteExpired()
 }
 
 // Close expires all items.

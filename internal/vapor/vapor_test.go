@@ -1,28 +1,28 @@
-//spellchecker:words rest impl
-package rest_impl_test
+//spellchecker:words vapor
+package vapor_test
 
-//spellchecker:words strconv sync atomic testing time github process over websocket internal rest impl
+//spellchecker:words strconv sync atomic testing time github process over websocket internal vapor
 import (
 	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/FAU-CDI/process_over_websocket/internal/rest_impl"
+	"github.com/FAU-CDI/process_over_websocket/internal/vapor"
 )
 
 func TestVapor_expire(t *testing.T) {
 	closed := make(chan struct{})
 
 	// create a vapor that just records it was closed
-	vap := rest_impl.Vapor[CloseFunc]{
+	vap := vapor.Vapor[CloseFunc]{
 		Initialize: func(f *CloseFunc) {
 			*f = func() error {
 				close(closed)
 				return nil
 			}
 		},
-		Finalize: func(fr rest_impl.FinalizeReason, cf *CloseFunc) { cf.Close() },
+		Finalize: func(fr vapor.FinalizeReason, cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			return "single-id"
 		},
@@ -52,14 +52,14 @@ func TestVapor_expire(t *testing.T) {
 
 func TestVapor_KeepAlive(t *testing.T) {
 	// create a vapor that fails the test if close is called
-	vap := rest_impl.Vapor[CloseFunc]{
+	vap := vapor.Vapor[CloseFunc]{
 		Initialize: func(cf *CloseFunc) {
 			*cf = func() error {
 				t.Fatal("Close() called unexpectedly")
 				return nil
 			}
 		},
-		Finalize: func(fr rest_impl.FinalizeReason, cf *CloseFunc) { cf.Close() },
+		Finalize: func(fr vapor.FinalizeReason, cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			return "single-id"
 		},
@@ -84,14 +84,14 @@ func TestVapor_Close(t *testing.T) {
 	closes := make(chan struct{})
 
 	var ids atomic.Int64 // holds the current numeric id
-	vap := rest_impl.Vapor[CloseFunc]{
+	vap := vapor.Vapor[CloseFunc]{
 		Initialize: func(cf *CloseFunc) {
 			*cf = func() error {
 				closes <- struct{}{}
 				return nil
 			}
 		},
-		Finalize: func(fr rest_impl.FinalizeReason, cf *CloseFunc) { cf.Close() },
+		Finalize: func(fr vapor.FinalizeReason, cf *CloseFunc) { cf.Close() },
 		NewID: func() string {
 			// automatically generate different ids
 			return strconv.FormatInt(ids.Add(1), 10)

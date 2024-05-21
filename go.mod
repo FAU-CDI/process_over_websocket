@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gosuri/uilive v0.0.4 // indirect
 	github.com/jellydator/ttlcache/v3 v3.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

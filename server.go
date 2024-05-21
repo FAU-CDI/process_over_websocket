@@ -119,7 +119,7 @@ func (server *Server) Shutdown() {
 		if server.rest == nil {
 			return
 		}
-		server.rest.Shutdown()
+		server.rest.Close()
 	}()
 
 	// and be done with it

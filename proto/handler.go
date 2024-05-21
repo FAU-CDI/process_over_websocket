@@ -12,7 +12,9 @@ import (
 type Handler interface {
 	// Get gets the process when the client requests a specific process.
 	//
-	// The request holds the original request that the client sent during the upgrade.
+	// The request holds the original request that the client sent to start the process.
+	// This may be a websocket upgrade request or whatever the client sent during the upgrade.
+	//
 	// It may return the special ErrHandlerUnknownProcess constants if something goes wrong.
 	Get(r *http.Request, name string, args ...string) (Process, error)
 }
@@ -54,13 +56,16 @@ var (
 	// Typically this indicates that the websocket connection has died, or that the timeout failed to ping the server without a specific time frame.
 	ErrCancelClientGone = errors.New("client has gone away")
 
+	// ErrCancelHandlerReturn indicates that the context is closed because the process handler has returned.
+	// Note that at this point any error handling code may be used to change server-side state, but this can no longer effect the client.
+	ErrCancelHandlerReturn = errors.New("handler has returned")
+
 	// CancelClientRequest indicates that the client has explicitly requested cancellation.
 	ErrCancelClientRequest = errors.New("client requested cancellation")
 
 	// ErrCancelProtocolError indicates that a protocol error occurred and the process should be cancelled for safety reasons.
 	ErrCancelProtocolError = errors.New("protocol error occurred")
 
-	// CancelTimeout indicates that a process timeout has occurred.
 	// This must have been requested by the client at an explicit time.
 	ErrCancelTimeout = errors.New("timeout expired")
 )

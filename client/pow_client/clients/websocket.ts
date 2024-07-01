@@ -1,6 +1,6 @@
 /** @file implements the websocket protocol used by the distillery */
 
-import WebSocket from 'isomorphic-ws'
+import WebSocket from 'modern-isomorphic-ws'
 import { Buffer } from 'buffer'
 import { type Session, type CallSpec, type Remote, type Result } from '../common/types'
 import { Lazy } from '../common/once'
@@ -55,9 +55,7 @@ export default class WebsocketSession implements Session {
               this.beforeCall()
             }
 
-            ws.send(Buffer.from(JSON.stringify(this.call), 'utf8'), () => {
-              _resolve()
-            })
+            this.#send(Buffer.from(JSON.stringify(this.call), 'utf8')).then(_resolve).catch(_reject)
           }
 
           ws.onmessage = ({ data, ...rest }: { data: unknown }) => {
@@ -74,12 +72,10 @@ export default class WebsocketSession implements Session {
 
           ws.onerror = (err: unknown) => {
             this.close()
-
-            // call the handler and reject
-            if (this.onError != null) {
-              this.onError(err)
-            }
+            
+            // reject both promised
             _reject(err)
+            reject(err)
           }
 
           ws.onclose = (event: { code: number, reason: string, wasClean: boolean }) => {
@@ -120,16 +116,17 @@ export default class WebsocketSession implements Session {
                 resolve({ success: false, data: 'protocol error: data field does not contain a message' })
                 return
               }
-
+              
               resolve({ success: false, data })
               return
             }
+  
             resolve({ success: true, data })
 
             this.close()
           }
         })
-      ).catch(() => {}) // discard error for now, and leave it for wait
+      )
     })
   }
 
@@ -193,20 +190,40 @@ export default class WebsocketSession implements Session {
     await this.#send(Buffer.from(JSON.stringify({ signal: 'close' }), 'utf8'))
   }
 
+  static readonly #useSyncronousSend = (typeof window !== 'undefined')
   async #send (data: string | Buffer): Promise<void> {
+   if (WebsocketSession.#useSyncronousSend) {
+    return await this.#sendSync(data)
+   }
+   return this.#sendAsync(data)
+  }
+
+  async #sendAsync(data: string | Buffer): Promise<void> {
     const ws = this.ws
     if (ws == null) {
       throw errNotConnected
     }
 
     await new Promise<void>((resolve, reject) => {
-      ws.send(data, (err: Error | undefined) => {
+      ws.send(data, {}, (err: Error | undefined) => {
         if (typeof err !== 'undefined' && err !== null) {
           reject(err)
           return
         }
         resolve()
       })
+    })
+  }
+
+  async #sendSync(data: string | Buffer): Promise<void> {
+    const ws = this.ws
+    if (ws == null) {
+      throw errNotConnected
+    }
+
+    await new Promise<void>(resolve => {
+      ws.send(data)
+      resolve()
     })
   }
 
@@ -221,3 +238,4 @@ export default class WebsocketSession implements Session {
     this.ws = null
   }
 }
+

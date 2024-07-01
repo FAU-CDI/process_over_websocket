@@ -1,5 +1,7 @@
-//spellchecker:words rest impl
-package rest_impl
+// Package finbuf implements [Buffer]
+//
+//spellchecker:words finbuf
+package finbuf
 
 //spellchecker:words sync github pkglib ringbuffer status
 import (
@@ -8,8 +10,6 @@ import (
 	"github.com/tkw1536/pkglib/ringbuffer"
 	"github.com/tkw1536/pkglib/status"
 )
-
-//spellchecker:words ringbuffer
 
 // FiniteBuffer is an [io.Writer] that contains a maximal number of lines.
 // Do not copy a non-zero LineBuffer.

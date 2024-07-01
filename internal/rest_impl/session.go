@@ -1,7 +1,7 @@
 //spellchecker:words rest impl
 package rest_impl
 
-//spellchecker:words sync github process over websocket proto
+//spellchecker:words context errors http sync github process over websocket internal finbuf proto pkglib recovery
 import (
 	"context"
 	"errors"
@@ -10,24 +10,35 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/FAU-CDI/process_over_websocket/internal/finbuf"
 	"github.com/FAU-CDI/process_over_websocket/proto"
 	"github.com/tkw1536/pkglib/recovery"
 )
 
+// Session holds information about an ongoing process
 type Session struct {
+	// m protects changing of state
 	m     sync.RWMutex
 	stage stage
 
+	// handler and call hold the original call
+	// used to initiate this session
 	handler proto.Handler
-	call    proto.CallMessage // original call
+	call    proto.CallMessage
 
+	// context and cancel can be used to cancel the underlying process
 	context context.Context
 	cancel  context.CancelCauseFunc
-	done    chan struct{} // closed once everything is done
 
+	// done is closed once the process has returned
+	done chan struct{}
+
+	// input to the session
 	inr *io.PipeReader
 	inw *io.PipeWriter
-	out FiniteBuffer // input / output
+
+	// out holds the output of this session
+	out finbuf.FiniteBuffer
 
 	// result of the process
 	result any
@@ -54,8 +65,7 @@ func (opt *SessionOpts) SetDefaults() {
 	}
 }
 
-// Init initializes this session.
-// No other method may be called prior to Init returning.
+// Init initializes this session, preparing it for accepting a new session.
 func (session *Session) Init(handler proto.Handler, ctx context.Context, opt SessionOpts) {
 	opt.SetDefaults()
 
@@ -120,6 +130,7 @@ func (session *Session) run(r *http.Request) {
 	}()
 }
 
+// CloseInput closes the input of the session
 func (session *Session) CloseInput() error {
 	return errors.Join(
 		session.inw.Close(),
@@ -129,6 +140,17 @@ func (session *Session) CloseInput() error {
 
 func (session *Session) Write(data []byte) (int, error) {
 	return session.inw.Write(data)
+}
+
+// Wait waits for this session to complete, and then returns it's result and error.
+// If context closes before the session is completed, immediately returns the context's error.
+func (session *Session) Wait(ctx context.Context) (result any, err error) {
+	select {
+	case <-session.done:
+		return session.result, session.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // CloseWith cancels the session with the given error
@@ -144,6 +166,25 @@ func (session *Session) CloseWith(err error) {
 	}()
 
 	<-session.done
+}
+
+// Stage returns information about the current stage of the session.
+//
+// Running indicates if the session is currently running it's associated process.
+// Started indicates if the session process was started previously.
+func (session *Session) Stage() (Running, Started bool) {
+	session.m.RLock()
+	defer session.m.RUnlock()
+
+	switch session.stage {
+	case stageInit:
+		return false, false
+	case stageRunning:
+		return true, false
+	case stageFinished:
+		return false, true
+	}
+	panic("never reached")
 }
 
 type Status struct {

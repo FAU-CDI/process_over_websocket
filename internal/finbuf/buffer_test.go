@@ -1,19 +1,19 @@
-//spellchecker:words rest impl
-package rest_impl_test
+//spellchecker:words finbuf
+package finbuf_test
 
-//spellchecker:words strconv sync github process over websocket internal rest impl
+//spellchecker:words strconv sync github process over websocket internal finbuf
 import (
 	"fmt"
 	"strconv"
 	"sync"
 
-	"github.com/FAU-CDI/process_over_websocket/internal/rest_impl"
+	"github.com/FAU-CDI/process_over_websocket/internal/finbuf"
 )
 
 func ExampleFiniteBuffer() {
 	N := 1000
 
-	var buffer rest_impl.FiniteBuffer
+	var buffer finbuf.FiniteBuffer
 	buffer.MaxLines = 2
 
 	// do a lot of concurrent reads and writes

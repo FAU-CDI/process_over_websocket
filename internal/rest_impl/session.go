@@ -210,19 +210,23 @@ func (session *Session) Status() Status {
 		}
 	case stageRunning:
 		return Status{
-			Running: false,
+			Running: true,
 			Started: true,
 
 			Buffer: session.out.String(),
 		}
 	case stageFinished:
+		var err string
+		if session.err != nil {
+			err = fmt.Sprint(session.err)
+		}
 		return Status{
 			Running: false,
-			Started: false,
+			Started: true,
 
 			Buffer: session.out.String(),
 			Result: session.result,
-			Err:    fmt.Sprint(session.err),
+			Err:    err,
 		}
 	}
 

@@ -5,13 +5,13 @@ package ws_impl
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/FAU-CDI/process_over_websocket/proto"
-	"github.com/tkw1536/pkglib/recovery"
 	"github.com/tkw1536/pkglib/websocketx"
 )
 
@@ -84,9 +84,9 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 		// close the underlying connection, and then wait for everything to finish!
 		defer wg.Wait()
 
-		// recover from any errors
-		if e := recovery.Recover(recover()); e != nil {
-			err = e
+		// recover from any panics
+		if recover := recover(); recover != nil {
+			err = fmt.Errorf("unknown error: %s", recover)
 		}
 
 		// assemble the close message

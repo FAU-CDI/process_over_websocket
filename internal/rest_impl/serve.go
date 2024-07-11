@@ -1,7 +1,7 @@
 //spellchecker:words rest impl
 package rest_impl
 
-//spellchecker:words context encoding json errors http sync time github process over websocket proto google uuid gorilla internal vapor
+//spellchecker:words context encoding json errors http sync time github process over websocket proto google uuid gorilla swaggest swgui pkglib httpx internal vapor embed
 import (
 	"context"
 	"encoding/json"

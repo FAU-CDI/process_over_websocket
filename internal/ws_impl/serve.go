@@ -1,7 +1,7 @@
 //spellchecker:words impl
 package ws_impl
 
-//spellchecker:words context encoding json http sync time github process over websocket proto pkglib recovery websocketx
+//spellchecker:words context encoding json http sync time github process over websocket proto pkglib websocketx
 import (
 	"context"
 	"encoding/json"

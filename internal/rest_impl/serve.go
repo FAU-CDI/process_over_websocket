@@ -14,15 +14,22 @@ import (
 	"github.com/FAU-CDI/process_over_websocket/proto"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/swaggest/swgui/v5emb"
+	"github.com/tkw1536/pkglib/httpx"
 
 	"github.com/FAU-CDI/process_over_websocket/internal/vapor"
+
+	_ "embed"
 )
+
+//go:embed openapi.json
+var specJSON []byte
 
 // NewServer creates a new rest server implementation
 func NewServer(handler proto.Handler, options Options) *Server {
 	return &Server{
 		handler: handler,
-		options: Options{},
+		options: options,
 	}
 }
 
@@ -30,6 +37,9 @@ func NewServer(handler proto.Handler, options Options) *Server {
 type Options struct {
 	// timeout after which new elements are automatically removed
 	Timeout time.Duration
+
+	// If set to true, don't serve an api under docs
+	DisableSwaggerUI bool
 
 	// options for the session
 	Session SessionOpts
@@ -84,6 +94,16 @@ func (server *Server) doInit() {
 		server.mux.HandleFunc("POST /input/{id}", server.serveInput)
 		server.mux.HandleFunc("POST /closeInput/{id}", server.serveCloseInput)
 		server.mux.HandleFunc("POST /cancel/{id}", server.serveCancel)
+
+		server.mux.Handle("GET /openapi.json", &httpx.Response{ContentType: "application/json", Body: []byte(specJSON)})
+		if !server.options.DisableSwaggerUI {
+			server.mux.Handle("/docs/", v5emb.New(
+				"process_over_websocket",
+				"/openapi.json",
+				"/docs/",
+			))
+		}
+
 	})
 }
 
@@ -221,7 +241,7 @@ func (server *Server) serveCancel(w http.ResponseWriter, r *http.Request) {
 
 	// done
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "input closed")
+	io.WriteString(w, "process cancelled")
 }
 
 var errServerClose = errors.New("server closing")

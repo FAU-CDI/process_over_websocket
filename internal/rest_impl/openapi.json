@@ -1,0 +1,352 @@
+{
+   "openapi": "3.0.0",
+   "info": {
+      "title": "Process Over Websocket API",
+      "description": "Allows a client to run server-defined processes via REST. \n",
+      "version": "1.0.0"
+   },
+   "servers": [
+      {
+         "url": "/"
+      }
+   ],
+   "paths": {
+      "/new": {
+         "post": {
+            "summary": "Create A New Process",
+            "description": "Creates and starts a new process with the given parameters",
+            "requestBody": {
+               "description": "The process to start",
+               "required": true,
+               "content": {
+                  "application/json": {
+                     "schema": {
+                        "type": "object",
+                        "properties": {
+                           "call": {
+                              "type": "string",
+                              "description": "Name of the process to start. ",
+                              "example": "echo"
+                           },
+                           "params": {
+                              "type": "array",
+                              "items": {
+                                 "type": "string",
+                                 "example": "some-parameter"
+                              },
+                              "description": "Arguments to pass to the process. If omitted, assumes no arguments. "
+                           }
+                        },
+                        "required": [
+                           "call"
+                        ]
+                     }
+                  }
+               }
+            },
+            "responses": {
+               "200": {
+                  "description": "Success: Process created successfully",
+                  "content": {
+                     "application/json": {
+                        "schema": {
+                           "type": "string",
+                           "example": "dbec0cb1-eaf9-4c18-bcd6-74136169a876",
+                           "description": "ID of the process created. Used for subsequent requests"
+                        }
+                     }
+                  }
+               },
+               "400": {
+                  "description": "Error: Bad Request",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "failed to decode call message"
+                        }
+                     }
+                  }
+               },
+               "500": {
+                  "description": "Error: Internal Server Error",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "failed to create new process"
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      },
+      "/status/{id}": {
+         "get": {
+            "summary": "Get Process Status",
+            "description": "get status of an ongoing or recently finished process",
+            "parameters": [
+               {
+                  "name": "id",
+                  "description": "ID of process",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "Success: Status of Process Available",
+                  "content": {
+                     "application/json": {
+                        "schema": {
+                           "type": "object",
+                           "properties": {
+                              "Started": {
+                                 "description": "Has the process been started?",
+                                 "type": "boolean"
+                              },
+                              "Running": {
+                                 "description": "Is the process currently running?",
+                                 "type": "boolean"
+                              },
+                              "Buffer": {
+                                 "description": "Current buffered output of the process (only if non-empty)",
+                                 "type": "string"
+                              },
+                              "Result": {
+                                 "description": "Value returned by the process (if it is finished and was successful)"
+                              },
+                              "Err": {
+                                 "description": "Error message (if the process failed or returned an error)",
+                                 "type": "string"
+                              }
+                           },
+                           "required": [
+                              "Started",
+                              "Running"
+                           ]
+                        }
+                     }
+                  }
+               },
+               "400": {
+                  "description": "Error: Bad Request",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "did not provide id"
+                        }
+                     }
+                  }
+               },
+               "404": {
+                  "description": "Error: Not Found",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "process not found"
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      },
+      "/input/{id}": {
+         "post": {
+            "summary": "Pass Input To Ongoing Process",
+            "description": "Send input to a process via its' standard input",
+            "parameters": [
+               {
+                  "name": "id",
+                  "description": "ID of process",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                     "type": "string"
+                  }
+               }
+            ],
+            "requestBody": {
+               "description": "Input to send to the process",
+               "required": true,
+               "content": {
+                  "text/plain": {
+                     "schema": {
+                        "type": "string",
+                        "example": "A new line\n"
+                     }
+                  }
+               }
+            },
+            "responses": {
+               "200": {
+                  "description": "Success: Input passed to process",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "input sent"
+                        }
+                     }
+                  }
+               },
+               "400": {
+                  "description": "Error: Bad Request",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "did not provide id"
+                        }
+                     }
+                  }
+               },
+               "404": {
+                  "description": "Error: Not Found",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "process not found"
+                        }
+                     }
+                  }
+               },
+               "500": {
+                  "description": "Error: Internal Server Error",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "error copying data to process"
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      },
+      "/closeInput/{id}": {
+         "post": {
+            "summary": "Close Input Of Ongoing Process",
+            "description": "Close the standard input of a process and prevent any further input from being sent",
+            "parameters": [
+               {
+                  "name": "id",
+                  "description": "ID of process",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "Success: Input closed",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "input closed"
+                        }
+                     }
+                  }
+               },
+               "400": {
+                  "description": "Error: Bad Request",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "did not provide id"
+                        }
+                     }
+                  }
+               },
+               "404": {
+                  "description": "Error: Not Found",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "process not found"
+                        }
+                     }
+                  }
+               },
+               "500": {
+                  "description": "Error: Internal Server Error",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "error closing input"
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      },
+      "/cancel/{id}": {
+         "post": {
+            "summary": "Cancel ongoing process",
+            "description": "Sends an interrupt signal to the given process",
+            "parameters": [
+               {
+                  "name": "id",
+                  "description": "ID of process",
+                  "in": "path",
+                  "required": true,
+                  "schema": {
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "Success: Cancelled",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "process cancelled"
+                        }
+                     }
+                  }
+               },
+               "400": {
+                  "description": "Error: Bad Request",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "did not provide id"
+                        }
+                     }
+                  }
+               },
+               "404": {
+                  "description": "Error: Not Found",
+                  "content": {
+                     "text/plain": {
+                        "schema": {
+                           "type": "string",
+                           "example": "process not found"
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+}

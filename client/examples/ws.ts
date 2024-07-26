@@ -1,6 +1,6 @@
 import { WebsocketSession } from '../pow_client'
 
-const session = new WebsocketSession({ url: 'ws://localhost:3000' }, { call: 'echo', params: ['random', 'params'] })
+const session = new WebsocketSession({ url: 'ws://localhost:3000/' }, { call: 'echo', params: ['random', 'params'] })
 session.onLogLine = console.log
 
 void (

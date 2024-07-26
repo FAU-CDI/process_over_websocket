@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/FAU-CDI/process_over_websocket/internal/clean"
 	"github.com/FAU-CDI/process_over_websocket/proto"
 	"github.com/tkw1536/pkglib/websocketx"
 )
@@ -24,8 +26,9 @@ var (
 type Options = websocketx.Options
 
 // NewServer creates a new server to handle websocket connections.
-func NewServer(handler proto.Handler, fallback http.Handler, options Options) *Server {
+func NewServer(path string, handler proto.Handler, fallback http.Handler, options Options) *Server {
 	server := &Server{
+		path: clean.Clean(path),
 		server: websocketx.Server{
 			Options:  options,
 			Fallback: fallback,
@@ -58,12 +61,17 @@ func NewServer(handler proto.Handler, fallback http.Handler, options Options) *S
 // If nothing unexpected happens (e.g. an abnormal closure from the client), the server will close the connection and send a
 // [proto.ResultMessage] to the client.
 type Server struct {
+	path    string
 	server  websocketx.Server
 	handler proto.Handler
 }
 
 // ServeHTTP implements handling the protocol
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasPrefix(r.URL.Path, server.path) {
+		http.NotFound(w, r)
+		return
+	}
 	server.server.ServeHTTP(w, r)
 }
 

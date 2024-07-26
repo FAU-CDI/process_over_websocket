@@ -24,6 +24,10 @@ type Server struct {
 }
 
 type Options struct {
+	// BasePath contains the base path of this server.
+	// It defaults to the root path ("/").
+	BasePath string
+
 	// DisableWebsocket can be set to entirely disable websocket handling.
 	DisableWebsocket bool
 	WebsocketOptions websocketx.Options
@@ -44,12 +48,12 @@ func (server *Server) doInit() {
 		server.handler = func() http.Handler {
 			// setup the rest server if requested
 			if !server.Options.DisableREST {
-				server.rest = rest_impl.NewServer(server.Handler, server.Options.RESTOptions)
+				server.rest = rest_impl.NewServer(server.Options.BasePath, server.Handler, server.Options.RESTOptions)
 			}
 
 			// setup the websocket handler if requested
 			if !server.Options.DisableWebsocket {
-				server.websocket = ws_impl.NewServer(server.Handler, server.rest, server.Options.WebsocketOptions)
+				server.websocket = ws_impl.NewServer(server.Options.BasePath, server.Handler, server.rest, server.Options.WebsocketOptions)
 			}
 
 			// nothing is enabled =>

@@ -24,6 +24,7 @@ func main() {
 
 	// create a new process_over_websocket Server
 	var server process_over_websocket.Server
+	server.Options.RESTOptions.OpenAPIServerDescription = "Process Over Websocket Testing Server"
 	server.Handler = proto.HandlerFunc(func(r *http.Request, name string, args ...string) (proto.Process, error) {
 		log.Printf("got request for %s %v", name, args)
 
@@ -69,8 +70,4 @@ func main() {
 
 	http_server.Serve(listen)
 	<-done
-}
-
-func init() {
-
 }

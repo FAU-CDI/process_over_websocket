@@ -17,6 +17,8 @@ import (
 	"github.com/swaggest/swgui/v5emb"
 	"github.com/tkw1536/pkglib/httpx"
 
+	"github.com/FAU-CDI/process_over_websocket/internal/clean"
+	"github.com/FAU-CDI/process_over_websocket/internal/omap"
 	"github.com/FAU-CDI/process_over_websocket/internal/vapor"
 
 	_ "embed"
@@ -26,8 +28,9 @@ import (
 var specJSON []byte
 
 // NewServer creates a new rest server implementation
-func NewServer(handler proto.Handler, options Options) *Server {
+func NewServer(path string, handler proto.Handler, options Options) *Server {
 	return &Server{
+		path:    path,
 		handler: handler,
 		options: options,
 	}
@@ -40,6 +43,9 @@ type Options struct {
 
 	// If set to true, don't serve an api under docs
 	DisableSwaggerUI bool
+
+	// Description for the server in openapi.json
+	OpenAPIServerDescription string
 
 	// options for the session
 	Session SessionOpts
@@ -63,6 +69,7 @@ type Server struct {
 	mux   http.ServeMux
 	vapor vapor.Vapor[Session]
 
+	path    string
 	options Options
 	handler proto.Handler
 }
@@ -89,22 +96,58 @@ func (server *Server) doInit() {
 			}
 		}
 
-		server.mux.HandleFunc("POST /new", server.serveNew)
-		server.mux.HandleFunc("GET /status/{id}", server.serveStatus)
-		server.mux.HandleFunc("POST /input/{id}", server.serveInput)
-		server.mux.HandleFunc("POST /closeInput/{id}", server.serveCloseInput)
-		server.mux.HandleFunc("POST /cancel/{id}", server.serveCancel)
+		base := clean.Clean(server.path)
 
-		server.mux.Handle("GET /openapi.json", &httpx.Response{ContentType: "application/json", Body: []byte(specJSON)})
+		server.mux.HandleFunc("POST "+base+"new", server.serveNew)
+		server.mux.HandleFunc("GET "+base+"status/{id}", server.serveStatus)
+		server.mux.HandleFunc("POST "+base+"input/{id}", server.serveInput)
+		server.mux.HandleFunc("POST "+base+"closeInput/{id}", server.serveCloseInput)
+		server.mux.HandleFunc("POST "+base+"cancel/{id}", server.serveCancel)
+
+		// format the openapi.json spec to contain the appropriate base path
+		spec, _ := getSpecWithServer(specJSON, base, server.options.OpenAPIServerDescription)
+		server.mux.Handle("GET "+base+"openapi.json", &httpx.Response{ContentType: "application/json", Body: spec})
+
+		// serve the api docs
 		if !server.options.DisableSwaggerUI {
-			server.mux.Handle("/docs/", v5emb.New(
+			server.mux.Handle(base+"docs/", v5emb.New(
 				"process_over_websocket",
-				"/openapi.json",
-				"/docs/",
+				base+"openapi.json",
+				base+"docs/",
 			))
 		}
-
 	})
+}
+
+// getSpecWithServer parses the spec, and place a single server url pointing to server.
+// If parsing fails, returns the original spec and an error.
+func getSpecWithServer(spec []byte, server, description string) ([]byte, error) {
+	// create the description object
+	serverSpec := []map[string]any{{"url": server}}
+	if description != "" {
+		serverSpec[0]["description"] = description
+	}
+	serverBytes, err := json.Marshal(serverSpec)
+	if err != nil {
+		return spec, err
+	}
+
+	var parsed omap.OrderedMap
+
+	// decode the json
+	if err := json.Unmarshal(spec, &parsed); err != nil || parsed == nil {
+		return spec, err
+	}
+
+	// set the parsed server
+	parsed.Set("servers", serverBytes)
+
+	// and re-marshal
+	result, err := json.Marshal(parsed)
+	if err != nil {
+		return spec, err
+	}
+	return result, nil
 }
 
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

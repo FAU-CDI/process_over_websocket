@@ -1,6 +1,6 @@
 import { RestSession } from '../pow_client'
 
-const session = new RestSession({ url: 'http://localhost:3000' }, { call: 'echo', params: ['random', 'params'] })
+const session = new RestSession({ url: 'http://localhost:3000/' }, { call: 'echo', params: ['random', 'params'] })
 
 void (
   async (): Promise<void> => {

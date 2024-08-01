@@ -53,12 +53,13 @@ This message may be sent from the client to the server to request the process to
 
 It should be the json object `{"signal":"cancel"}`.
 
-**Close Frame**
+**Close Frame & Result Message**
 
-When the process finishes, the server terminates the connection with a close frame. 
-The reason field will contain a json-encoded object with two fields. 
-The `success` field is a boolean indicating if the process succeeded.
-The `data` field will either contain an error message string (in case of failure) or the process result (in case of success).
+When the process finishes, the server sends a json-encoded binary frame to the client.
+- success messages contain the field `status` set to the string `"fulfilled"` and the optional `value` field with a json-encoded process result.
+- failure messaged contain the field `status` set to the string `"rejected"` and the optional `reason` field with a string containing an error message.
+
+Afterwards the server sends a close frame with the normal closure code and an empty reason field. 
 
 ## REST API
 

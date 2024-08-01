@@ -68,11 +68,18 @@ type Server struct {
 
 // ServeHTTP implements handling the protocol
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.URL.Path, server.path) {
+	if !server.isValidRequestPath(r.URL.Path) {
 		http.NotFound(w, r)
 		return
 	}
 	server.server.ServeHTTP(w, r)
+}
+
+func (server *Server) isValidRequestPath(path string) bool {
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+	return strings.HasPrefix(path, server.path)
 }
 
 func (server *Server) handle(conn *websocketx.Connection) {
@@ -98,14 +105,21 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 		}
 
 		// assemble the close message
-		// and return it
-		var msg proto.ResultMessage
-		if err == nil {
-			msg = proto.ResultMessageSuccess(res)
-		} else {
-			msg = proto.ResultMessageFailure(err)
+		result := proto.Result{Value: res, Reason: err}
+		data, _ := result.MarshalJSON()
+
+		// if the connection is already done, bail out!
+		if conn.Context().Err() != nil {
+			return
 		}
-		conn.ShutdownWith(msg.Frame())
+
+		// write the close data
+		if err := conn.Write(websocketx.NewBinaryMessage(data)); err != nil {
+			return
+		}
+
+		// and close the connection
+		conn.ShutdownWith(websocketx.CloseFrame{})
 	}()
 
 	// create a channel for all future text messages

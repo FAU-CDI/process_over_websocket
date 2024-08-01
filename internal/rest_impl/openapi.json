@@ -104,31 +104,87 @@
                      "application/json": {
                         "schema": {
                            "type": "object",
-                           "properties": {
-                              "Started": {
-                                 "description": "Has the process been started?",
-                                 "type": "boolean"
-                              },
-                              "Running": {
-                                 "description": "Is the process currently running?",
-                                 "type": "boolean"
-                              },
-                              "Buffer": {
-                                 "description": "Current buffered output of the process (only if non-empty)",
-                                 "type": "string"
-                              },
-                              "Result": {
-                                 "description": "Value returned by the process (if it is finished and was successful)"
-                              },
-                              "Err": {
-                                 "description": "Error message (if the process failed or returned an error)",
-                                 "type": "string"
-                              }
-                           },
                            "required": [
-                              "Started",
-                              "Running"
-                           ]
+                              "result"
+                           ],
+                           "properties": {
+                              "result": {
+                                 "oneOf": [
+                                    {
+                                       "type": "object",
+                                       "required": [
+                                          "status"
+                                       ],
+                                       "description": "process completed successfully",
+                                       "properties": {
+                                          "status": {
+                                             "type": "string",
+                                             "enum": [
+                                                "fulfilled"
+                                             ]
+                                          },
+                                          "value": {
+                                             "oneOf": [
+                                                {
+                                                   "type": "string"
+                                                },
+                                                {
+                                                   "type": "number"
+                                                },
+                                                {
+                                                   "type": "boolean"
+                                                },
+                                                {
+                                                   "type": "object"
+                                                },
+                                                {
+                                                   "type": "array"
+                                                }
+                                             ]
+                                          }
+                                       }
+                                    },
+                                    {
+                                       "type": "object",
+                                       "required": [
+                                          "status"
+                                       ],
+                                       "description": "process failed to complete",
+                                       "properties": {
+                                          "status": {
+                                             "type": "string",
+                                             "enum": [
+                                                "rejected"
+                                             ]
+                                          },
+                                          "reason": {
+                                             "description": "error that occurred to cause the process to fail",
+                                             "type": "string"
+                                          }
+                                       }
+                                    },
+                                    {
+                                       "type": "object",
+                                       "required": [
+                                          "status"
+                                       ],
+                                       "description": "the process is still executing",
+                                       "properties": {
+                                          "status": {
+                                             "type": "string",
+                                             "enum": [
+                                                "pending"
+                                             ]
+                                          }
+                                       }
+                                    }
+                                 ]
+                              },
+                              "buffer": {
+                                 "type": "string",
+                                 "description": "text content of the buffer"
+                              }
+                           }
                         }
                      }
                   }

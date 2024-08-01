@@ -7,8 +7,6 @@ package proto
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/tkw1536/pkglib/websocketx"
 )
 
 // CallMessage is sent by the client to the server to invoke a remote procedure.
@@ -34,39 +32,43 @@ const Subprotocol = "pow-1"
 
 var ErrWrongSubprotocol = fmt.Errorf("only support subprotocol %q", Subprotocol)
 
-// ResultMessage encapsulates the result of a process.
-// See [ResultMessageSuccess] and [ResultMessageFailure]
-type ResultMessage struct {
-	Success bool `json:"success"`
-	Data    any  `json:"data"`
+type Result struct {
+	Value  any
+	Reason error
 }
 
-func (rm ResultMessage) Frame() websocketx.CloseFrame {
-	data, err := json.Marshal(rm)
-	if err != nil {
-		return websocketx.CloseFrame{
-			Code:   websocketx.StatusInternalErr,
-			Reason: "error encoding ResultMessage",
+// MarshalJSON marshals this result as a message
+func (res *Result) MarshalJSON() ([]byte, error) {
+	if res == nil {
+		return []byte(`{"status":"pending"}`), nil
+	}
+
+	status := "rejected"
+	data := "reason"
+	if res.Reason == nil {
+		status = "fulfilled"
+		data = "value"
+	}
+
+	content := (func() string {
+		defer func() {
+			recover() // ignore any panic()s during the marshal
+		}()
+
+		if res.Reason != nil {
+			return fmt.Sprint(res.Reason)
 		}
-	}
-	return websocketx.CloseFrame{
-		Code:   websocketx.StatusNormalClosure,
-		Reason: string(data),
-	}
-}
 
-// ResultMessageFailure formats a message for a failed process.
-func ResultMessageFailure(err error) ResultMessage {
-	return ResultMessage{
-		Success: false,
-		Data:    fmt.Sprint(err),
-	}
-}
+		// format the value
+		bytes, err := json.Marshal(res.Value)
+		if err != nil {
+			return ""
+		}
+		return string(bytes)
+	})()
 
-// ResultMessageSuccess formats a message for a succeeded process.
-func ResultMessageSuccess(data any) ResultMessage {
-	return ResultMessage{
-		Success: true,
-		Data:    data,
+	if len(content) == 0 {
+		return []byte(`{"status":"` + status + `"}`), nil
 	}
+	return []byte(`{"status":"` + status + `","` + data + `":` + content + `}`), nil
 }

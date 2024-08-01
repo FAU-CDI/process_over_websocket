@@ -4,8 +4,8 @@ package rest_impl
 //spellchecker:words context errors http sync github process over websocket internal finbuf proto pkglib recovery
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -188,13 +188,25 @@ func (session *Session) Stage() (Running, Started bool) {
 }
 
 type Status struct {
-	Started bool // has the process been started?
-	Running bool // is the process running?
+	Buffer string
+	Result *proto.Result
+}
 
-	Buffer string `json:",omitempty"` // the current output buffer
+type statusJSON struct {
+	Buffer string          `json:"buffer,omitempty"`
+	Result json.RawMessage `json:"result"`
+}
 
-	Result any    `json:",omitempty"` // overall result (if any)
-	Err    string `json:",omitempty"` // error (if any)
+func (status Status) MarshalJSON() ([]byte, error) {
+	var data statusJSON
+	var err error
+
+	data.Buffer = status.Buffer
+	data.Result, err = status.Result.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(data)
 }
 
 // Status returns the status
@@ -204,29 +216,19 @@ func (session *Session) Status() Status {
 
 	switch session.stage {
 	case stageInit:
-		return Status{
-			Running: false,
-			Started: false,
-		}
+		return Status{}
 	case stageRunning:
 		return Status{
-			Running: true,
-			Started: true,
-
+			Result: nil,
 			Buffer: session.out.String(),
 		}
 	case stageFinished:
-		var err string
-		if session.err != nil {
-			err = fmt.Sprint(session.err)
-		}
 		return Status{
-			Running: false,
-			Started: true,
-
+			Result: &proto.Result{
+				Value:  session.result,
+				Reason: session.err,
+			},
 			Buffer: session.out.String(),
-			Result: session.result,
-			Err:    err,
 		}
 	}
 

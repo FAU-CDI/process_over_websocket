@@ -7,7 +7,7 @@ require (
 	github.com/gorilla/websocket v1.5.1
 	github.com/jellydator/ttlcache/v3 v3.2.0
 	github.com/swaggest/swgui v1.8.1
-	github.com/tkw1536/pkglib v0.0.0-20240426113100-050f34d1e1dd
+	github.com/tkw1536/pkglib v0.0.0-20240801115724-302162d5da99
 )
 
 require (

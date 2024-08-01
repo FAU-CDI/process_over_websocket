@@ -26,8 +26,8 @@ github.com/tdewolff/parse v2.3.4+incompatible h1:x05/cnGwIMf4ceLuDMBOdQ1qGniMoxp
 github.com/tdewolff/parse v2.3.4+incompatible/go.mod h1:8oBwCsVmUkgHO8M5iCzSIDtpzXOT0WXX9cWhz+bIzJQ=
 github.com/tdewolff/test v1.0.7 h1:8Vs0142DmPFW/bQeHRP3MV19m1gvndjUb1sn8yy74LM=
 github.com/tdewolff/test v1.0.7/go.mod h1:6DAvZliBAAnD7rhVgwaM7DE5/d9NMOAJ09SqYqeK4QE=
-github.com/tkw1536/pkglib v0.0.0-20240426113100-050f34d1e1dd h1:mKzWNMHNO6MCS4wIWsyaC66qxAx7QCOvw69i9DbZvnY=
-github.com/tkw1536/pkglib v0.0.0-20240426113100-050f34d1e1dd/go.mod h1:P/9GGxNGvEZsYShL7bv57UdiHkR0l6AWz1IDMVJGzlY=
+github.com/tkw1536/pkglib v0.0.0-20240801115724-302162d5da99 h1:M0yKhvGzgzqUlL9rOrUPH1u0IErAwc8B1xwm4tT7qos=
+github.com/tkw1536/pkglib v0.0.0-20240801115724-302162d5da99/go.mod h1:P/9GGxNGvEZsYShL7bv57UdiHkR0l6AWz1IDMVJGzlY=
 github.com/vearutop/statigz v1.4.0 h1:RQL0KG3j/uyA/PFpHeZ/L6l2ta920/MxlOAIGEOuwmU=
 github.com/vearutop/statigz v1.4.0/go.mod h1:LYTolBLiz9oJISwiVKnOQoIwhO1LWX1A7OECawGS8XE=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=

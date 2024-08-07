@@ -34,6 +34,8 @@ export default class WebsocketSession implements Session {
   /** connect checks if the connect method was called */
   #connected: boolean = false
 
+  private static decoder = new TextDecoder()
+
   async connect (): Promise<void> {
     // ensure that connect is only run once.
     if (this.#connected) {
@@ -48,6 +50,7 @@ export default class WebsocketSession implements Session {
         async () => await new Promise<Result>((resolve, reject) => {
           // create the websocket
           const ws = new WebSocket(this.remote.url, PROTOCOL, this.remote.headers)
+          ws.binaryType = 'arraybuffer'
           this.ws = ws // make it available to other thing
 
           ws.onopen = () => {
@@ -63,19 +66,19 @@ export default class WebsocketSession implements Session {
           ws.onmessage = ({ data, ...rest }: { data: unknown }) => {
             // ignore non-strings for now
             if (typeof data !== 'string') {
-              if (!(data instanceof Buffer)) {
-                console.error('websocket implementation did not return a buffer')
+              if (!(data instanceof ArrayBuffer)) {
+                console.error('websocket implementation did not return a buffer or blob')
                 return
               }
 
               try {
-                const raw = JSON.parse(data.toString())
+                const raw = JSON.parse(WebsocketSession.decoder.decode(data))
                 if (!isResult(raw, false)) {
                   throw new Error('result message is not an object')
                 }
                 receivedResult = raw
               } catch(err: unknown) {
-                  console.error('failed to decode result message', err)
+                  console.error('failed to decode result message', err, data)
               }
               return
             }

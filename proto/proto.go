@@ -55,12 +55,14 @@ func (res *Result) MarshalJSON() ([]byte, error) {
 			recover() // ignore any panic()s during the marshal
 		}()
 
+		// find the object to marshal
+		obj := res.Value
 		if res.Reason != nil {
-			return fmt.Sprint(res.Reason)
+			obj = fmt.Sprint(res.Reason)
 		}
 
 		// format the value
-		bytes, err := json.Marshal(res.Value)
+		bytes, err := json.Marshal(obj)
 		if err != nil {
 			return ""
 		}

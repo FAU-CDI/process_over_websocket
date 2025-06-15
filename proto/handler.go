@@ -19,7 +19,7 @@ type Handler interface {
 	Get(r *http.Request, name string, args ...string) (Process, error)
 }
 
-// HandlerFunc implements Handler
+// HandlerFunc implements Handler.
 type HandlerFunc func(r *http.Request, name string, args ...string) (Process, error)
 
 func (hf HandlerFunc) Get(r *http.Request, name string, args ...string) (Process, error) {
@@ -32,7 +32,7 @@ var (
 	ErrHandlerAuthorizationDenied = errors.New("authorization denied")
 )
 
-// Process represents a process handled by the protocol
+// Process represents a process handled by the protocol.
 type Process interface {
 	// Do starts a process and exists once it is complete.
 	//
@@ -44,7 +44,7 @@ type Process interface {
 	Do(ctx context.Context, input io.Reader, output io.Writer, args ...string) (any, error)
 }
 
-// ProcessFunc implements Process
+// ProcessFunc implements Process.
 type ProcessFunc func(ctx context.Context, input io.Reader, output io.Writer, args ...string) (any, error)
 
 func (pf ProcessFunc) Do(ctx context.Context, input io.Reader, output io.Writer, args ...string) (any, error) {

@@ -1,5 +1,7 @@
+//spellchecker:words clean
 package clean
 
+//spellchecker:words path strings
 import (
 	"path"
 	"strings"

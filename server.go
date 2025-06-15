@@ -37,7 +37,7 @@ type Options struct {
 	RESTOptions rest_impl.Options
 }
 
-// ServeHTTP serves a request
+// ServeHTTP serves a request.
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server.doInit()
 	server.handler.ServeHTTP(w, r)

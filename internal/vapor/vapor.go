@@ -58,7 +58,7 @@ type Vapor[T any] struct {
 	cache *ttlcache.Cache[string, *entry[T]] // holds the actual items
 }
 
-// FinalizeReason indicates a reason why Finalize was called
+// FinalizeReason indicates a reason why Finalize was called.
 type FinalizeReason uint64
 
 const (
@@ -66,7 +66,7 @@ const (
 	FinalizeReasonExpired
 )
 
-// entry holds information about a single item
+// entry holds information about a single item.
 type entry[T any] struct {
 	init  sync.Once
 	value T
@@ -81,7 +81,7 @@ var (
 	errStopped  = errors.New("Vapor: No longer accepting new elements")
 )
 
-// newEntry creates a new entry within the underlying cache and returns it
+// newEntry creates a new entry within the underlying cache and returns it.
 func (vap *Vapor[T]) newEntry(d time.Duration) (string, *ttlcache.Item[string, *entry[T]], error) {
 	vap.start()
 
@@ -115,7 +115,7 @@ func (vap *Vapor[T]) newEntry(d time.Duration) (string, *ttlcache.Item[string, *
 	return "", nil, errNoID
 }
 
-// initItem initializes the given item, returning the actual value
+// initItem initializes the given item, returning the actual value.
 func (vap *Vapor[T]) initItem(item *ttlcache.Item[string, *entry[T]]) *T {
 	entry := item.Value()
 	entry.init.Do(func() {
@@ -126,7 +126,7 @@ func (vap *Vapor[T]) initItem(item *ttlcache.Item[string, *entry[T]]) *T {
 	return &entry.value
 }
 
-// vap ensures that the vapor is in started state
+// vap ensures that the vapor is in started state.
 func (vap *Vapor[T]) start() {
 	vap.init.Do(func() {
 		// create a new cache which closes items on eviction
@@ -138,12 +138,15 @@ func (vap *Vapor[T]) start() {
 
 			// determine the reason for eviction
 			var fr FinalizeReason
-			if er == ttlcache.EvictionReasonDeleted {
+			switch er {
+			case ttlcache.EvictionReasonDeleted:
 				fr = FinalizeReasonDeleted
-			} else if er == ttlcache.EvictionReasonExpired {
+			case ttlcache.EvictionReasonExpired:
 				fr = FinalizeReasonExpired
-			} else {
-				panic("unknown eviction reason")
+			case ttlcache.EvictionReasonCapacityReached:
+				fallthrough
+			default:
+				panic("never reached: unknown eviction reason")
 			}
 			vap.Finalize(fr, vap.initItem(i))
 		})
@@ -160,7 +163,7 @@ func (vap *Vapor[T]) start() {
 	go vap.cache.Start()
 }
 
-// vap ensures that the vapor is in stopped state
+// vap ensures that the vapor is in stopped state.
 func (vap *Vapor[T]) stop() {
 	vap.startStopM.Lock()
 	defer vap.startStopM.Unlock()

@@ -1,10 +1,11 @@
 //spellchecker:words impl
 package ws_impl
 
-//spellchecker:words context encoding json http sync time github process over websocket proto pkglib websocketx
+//spellchecker:words context encoding json http strings sync time github process over websocket internal clean proto pkglib errorsx websocketx
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/FAU-CDI/process_over_websocket/internal/clean"
 	"github.com/FAU-CDI/process_over_websocket/proto"
+	"github.com/tkw1536/pkglib/errorsx"
 	"github.com/tkw1536/pkglib/websocketx"
 )
 
@@ -66,7 +68,7 @@ type Server struct {
 	handler proto.Handler
 }
 
-// ServeHTTP implements handling the protocol
+// ServeHTTP implements handling the protocol.
 func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !server.isValidRequestPath(r.URL.Path) {
 		http.NotFound(w, r)
@@ -77,7 +79,7 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (server *Server) isValidRequestPath(path string) bool {
 	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
+		path += "/"
 	}
 	return strings.HasPrefix(path, server.path)
 }
@@ -85,6 +87,8 @@ func (server *Server) isValidRequestPath(path string) bool {
 func (server *Server) handle(conn *websocketx.Connection) {
 	_, _ = server.serve(conn)
 }
+
+var errUnknown = errors.New("unknown error")
 
 func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 	// check that the client specified the correct subprotocol.
@@ -99,9 +103,9 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 		// close the underlying connection, and then wait for everything to finish!
 		defer wg.Wait()
 
-		// recover from any panics
-		if recover := recover(); recover != nil {
-			err = fmt.Errorf("unknown error: %s", recover)
+		// value from any panics
+		if value := recover(); value != nil {
+			err = fmt.Errorf("%w: %v", errUnknown, value)
 		}
 
 		// assemble the close message
@@ -228,13 +232,15 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 	// Find the right process
 	process, err := server.handler.Get(conn.Request(), call.Call, call.Params...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get process: %w", err)
 	}
 
 	// create a pipe to handle the input
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer errorsx.Close(writer, &err, "writer")
 
+	// TODO: this ignores a whole bunch of errors.
+	// not sure what to do with them.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -243,11 +249,11 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 			if text == nil {
 				goto no_more
 			}
-			writer.Write(text)
+			_, _ = writer.Write(text)
 		}
 
 	no_more:
-		writer.Close()
+		_ = writer.Close()
 
 		// drain channel
 		for range textMessages {
@@ -257,12 +263,18 @@ func (server *Server) serve(conn *websocketx.Connection) (res any, err error) {
 	// write the output to the client as it comes in!
 	// TODO: We may eventually need buffering here ...
 	output := WriterFunc(func(b []byte) (int, error) {
-		conn.WriteText(string(b))
+		if err := conn.WriteText(string(b)); err != nil {
+			return 0, fmt.Errorf("failed to write to connection: %w", err)
+		}
 		return len(b), nil
 	})
 
 	// do the actual processing
-	return process.Do(ctx, reader, output, call.Params...)
+	value, err := process.Do(ctx, reader, output, call.Params...)
+	if err != nil {
+		return nil, fmt.Errorf("process returned error: %w", err)
+	}
+	return value, nil
 }
 
 func (server *Server) Close() {

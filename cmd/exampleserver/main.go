@@ -4,6 +4,7 @@ package main
 //spellchecker:words context http signal github process over websocket proto
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -40,16 +41,18 @@ func main() {
 			defer log.Println("process exited")
 
 			// copy over the content
-			io.Copy(output, input)
+			if _, err := io.Copy(output, input); err != nil {
+				return nil, fmt.Errorf("failed to copy: %w", err)
+			}
 
 			return args, context.Cause(ctx)
 		}), nil
 	})
 
 	// start listening
-	listen, err := net.Listen("tcp", bind_addr)
+	listen, err := net.Listen("tcp", bind_addr) //#nosec G102 -- bind_addr is a parameter
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Panicf("failed to listen: %v", err)
 	}
 	log.Println("listening on ", bind_addr)
 
@@ -65,9 +68,10 @@ func main() {
 		log.Println("shutting down process_over_websocket server")
 		server.Shutdown() // shutdown the websocket server
 		log.Println("shutting down http server")
-		http_server.Shutdown(context.Background()) // shutdown the http server
+		//nolint:contextcheck
+		_ = http_server.Shutdown(context.Background()) // shutdown the http server
 	}()
 
-	http_server.Serve(listen)
+	_ = http_server.Serve(listen)
 	<-done
 }

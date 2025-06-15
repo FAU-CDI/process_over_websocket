@@ -12,6 +12,8 @@ import (
 )
 
 func TestVapor_expire(t *testing.T) {
+	t.Parallel()
+
 	closed := make(chan struct{})
 
 	// create a vapor that just records it was closed
@@ -51,6 +53,8 @@ func TestVapor_expire(t *testing.T) {
 }
 
 func TestVapor_KeepAlive(t *testing.T) {
+	t.Parallel()
+
 	// create a vapor that fails the test if close is called
 	vap := vapor.Vapor[CloseFunc]{
 		Initialize: func(cf *CloseFunc) {
@@ -76,11 +80,13 @@ func TestVapor_KeepAlive(t *testing.T) {
 	// so it doesn't expire
 	for range 10 {
 		time.Sleep(timeout / 2)
-		vap.Get(elem)
+		_, _ = vap.Get(elem)
 	}
 }
 
 func TestVapor_Close(t *testing.T) {
+	t.Parallel()
+
 	closes := make(chan struct{})
 
 	var ids atomic.Int64 // holds the current numeric id
@@ -127,12 +133,11 @@ func TestVapor_Close(t *testing.T) {
 	case <-done:
 		/* everything has closed */
 	}
-
 }
 
-// CloseFunc has a Close Function
+// CloseFunc has a Close Function.
 type CloseFunc func() error
 
 func (cf CloseFunc) Close() {
-	cf()
+	_ = cf()
 }

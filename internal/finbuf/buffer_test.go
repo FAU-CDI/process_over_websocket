@@ -33,7 +33,7 @@ func ExampleFiniteBuffer() {
 		for range N {
 			go func() {
 				defer wg.Done()
-				buffer.Write([]byte("another line\n"))
+				_, _ = buffer.Write([]byte("another line\n"))
 			}()
 		}
 		wg.Wait()
@@ -42,7 +42,7 @@ func ExampleFiniteBuffer() {
 	// now write lines in order
 	// because the buffer
 	for i := range N {
-		buffer.Write([]byte(strconv.Itoa(N-i) + "\n"))
+		_, _ = buffer.Write([]byte(strconv.Itoa(N-i) + "\n"))
 	}
 
 	// the last two lines should be left

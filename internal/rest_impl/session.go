@@ -1,11 +1,12 @@
 //spellchecker:words rest impl
 package rest_impl
 
-//spellchecker:words context errors http sync github process over websocket internal finbuf proto pkglib recovery
+//spellchecker:words context encoding json errors http sync github process over websocket internal finbuf proto pkglib recovery
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -15,7 +16,9 @@ import (
 	"github.com/tkw1536/pkglib/recovery"
 )
 
-// Session holds information about an ongoing process
+// Session holds information about an ongoing process.
+//
+//nolint:containedctx
 type Session struct {
 	// m protects changing of state
 	m     sync.RWMutex
@@ -78,7 +81,7 @@ func (session *Session) Init(handler proto.Handler, ctx context.Context, opt Ses
 	session.inr, session.inw = io.Pipe()
 }
 
-// Start starts the given call in this session
+// Start starts the given call in this session.
 func (session *Session) Start(r *http.Request, call proto.CallMessage) bool {
 	session.m.Lock()
 	defer session.m.Unlock()
@@ -116,13 +119,13 @@ func (session *Session) run(r *http.Request) {
 		session.stage = stageFinished
 	}()
 	defer session.cancel(proto.ErrCancelHandlerReturn)
-	defer session.inw.Close()
+	defer func() { _ = session.inw.Close() }()
 
 	res, err = func() (any, error) {
 		// get the handler
 		process, err := session.handler.Get(r, session.call.Call, session.call.Params...)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get process: %w", err)
 		}
 
 		// and do the call
@@ -130,7 +133,7 @@ func (session *Session) run(r *http.Request) {
 	}()
 }
 
-// CloseInput closes the input of the session
+// CloseInput closes the input of the session.
 func (session *Session) CloseInput() error {
 	return errors.Join(
 		session.inw.Close(),
@@ -139,7 +142,11 @@ func (session *Session) CloseInput() error {
 }
 
 func (session *Session) Write(data []byte) (int, error) {
-	return session.inw.Write(data)
+	n, err := session.inw.Write(data)
+	if err != nil {
+		return n, fmt.Errorf("failed to write input: %w", err)
+	}
+	return n, nil
 }
 
 // Wait waits for this session to complete, and then returns it's result and error.
@@ -149,11 +156,12 @@ func (session *Session) Wait(ctx context.Context) (result any, err error) {
 	case <-session.done:
 		return session.result, session.err
 	case <-ctx.Done():
+		//nolint:wrapcheck
 		return nil, ctx.Err()
 	}
 }
 
-// CloseWith cancels the session with the given error
+// CloseWith cancels the session with the given error.
 func (session *Session) CloseWith(err error) {
 	func() {
 		session.m.RLock()
@@ -162,7 +170,7 @@ func (session *Session) CloseWith(err error) {
 		if session.cancel != nil {
 			session.cancel(err)
 		}
-		session.CloseInput()
+		_ = session.CloseInput() // TODO: not sure what to do with this error
 	}()
 
 	<-session.done
@@ -170,9 +178,9 @@ func (session *Session) CloseWith(err error) {
 
 // Stage returns information about the current stage of the session.
 //
-// Running indicates if the session is currently running it's associated process.
+// Running indicates if the session is currently running its associated process.
 // Started indicates if the session process was started previously.
-func (session *Session) Stage() (Running, Started bool) {
+func (session *Session) Stage() (running, started bool) {
 	session.m.RLock()
 	defer session.m.RUnlock()
 
@@ -204,12 +212,17 @@ func (status Status) MarshalJSON() ([]byte, error) {
 	data.Buffer = status.Buffer
 	data.Result, err = status.Result.MarshalJSON()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal result as json: %w", err)
 	}
-	return json.Marshal(data)
+
+	res, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal data: %w", err)
+	}
+	return res, nil
 }
 
-// Status returns the status
+// Status returns the status.
 func (session *Session) Status() Status {
 	session.m.RLock()
 	defer session.m.RUnlock()

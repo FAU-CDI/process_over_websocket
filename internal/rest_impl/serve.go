@@ -1,11 +1,12 @@
 //spellchecker:words rest impl
 package rest_impl
 
-//spellchecker:words context encoding json errors http sync time github process over websocket proto google uuid gorilla swaggest swgui pkglib httpx internal vapor embed
+//spellchecker:words context encoding json errors http sync time github process over websocket proto google uuid gorilla swaggest swgui pkglib httpx internal clean omap vapor embed
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -27,7 +28,7 @@ import (
 //go:embed openapi.json
 var specJSON []byte
 
-// NewServer creates a new rest server implementation
+// NewServer creates a new rest server implementation.
 func NewServer(path string, handler proto.Handler, options Options) *Server {
 	return &Server{
 		path:    path,
@@ -36,7 +37,7 @@ func NewServer(path string, handler proto.Handler, options Options) *Server {
 	}
 }
 
-// Options are the options for a rest server
+// Options are the options for a rest server.
 type Options struct {
 	// timeout after which new elements are automatically removed
 	Timeout time.Duration
@@ -59,6 +60,7 @@ func (opt *Options) SetDefaults() {
 	}
 }
 
+//nolint:containedctx
 type Server struct {
 	init sync.Once // called once for initialization
 
@@ -105,7 +107,10 @@ func (server *Server) doInit() {
 		server.mux.HandleFunc("POST "+base+"cancel/{id}", server.serveCancel)
 
 		// format the openapi.json spec to contain the appropriate base path
-		spec, _ := getSpecWithServer(specJSON, base, server.options.OpenAPIServerDescription)
+		spec, err := getSpecWithServer(specJSON, base, server.options.OpenAPIServerDescription)
+		if err != nil {
+			panic("failed to get spec with server (shouldn't happen): " + err.Error())
+		}
 		server.mux.Handle("GET "+base+"openapi.json", &httpx.Response{ContentType: "application/json", Body: spec})
 
 		// serve the api docs
@@ -129,14 +134,14 @@ func getSpecWithServer(spec []byte, server, description string) ([]byte, error) 
 	}
 	serverBytes, err := json.Marshal(serverSpec)
 	if err != nil {
-		return spec, err
+		return spec, fmt.Errorf("failed to marshal server spec: %w", err)
 	}
 
 	var parsed omap.OrderedMap
 
 	// decode the json
 	if err := json.Unmarshal(spec, &parsed); err != nil || parsed == nil {
-		return spec, err
+		return spec, fmt.Errorf("failed to parse openapi spec: %w", err)
 	}
 
 	// set the parsed server
@@ -145,7 +150,7 @@ func getSpecWithServer(spec []byte, server, description string) ([]byte, error) 
 	// and re-marshal
 	result, err := json.Marshal(parsed)
 	if err != nil {
-		return spec, err
+		return spec, fmt.Errorf("failed to marshal openapi spec (shouldn't happen): %w", err)
 	}
 	return result, nil
 }
@@ -189,7 +194,7 @@ func (server *Server) serveNew(w http.ResponseWriter, r *http.Request) {
 
 	// return the new id to the client
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(id)
+	_ = json.NewEncoder(w).Encode(id) //nolint:errchkjson
 }
 
 func (server *Server) serveStatus(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +214,7 @@ func (server *Server) serveStatus(w http.ResponseWriter, r *http.Request) {
 
 	// marshal the status into the response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(session.Status())
+	_ = json.NewEncoder(w).Encode(session.Status()) //nolint:errchkjson
 }
 
 func (server *Server) serveInput(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +240,7 @@ func (server *Server) serveInput(w http.ResponseWriter, r *http.Request) {
 
 	// done
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "input sent")
+	_, _ = io.WriteString(w, "input sent")
 }
 
 func (server *Server) serveCloseInput(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +266,7 @@ func (server *Server) serveCloseInput(w http.ResponseWriter, r *http.Request) {
 
 	// done
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "input closed")
+	_, _ = io.WriteString(w, "input closed")
 }
 
 func (server *Server) serveCancel(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +289,7 @@ func (server *Server) serveCancel(w http.ResponseWriter, r *http.Request) {
 
 	// done
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "process cancelled")
+	_, _ = io.WriteString(w, "process cancelled")
 }
 
 var errServerClose = errors.New("server closing")

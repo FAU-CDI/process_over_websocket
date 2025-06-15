@@ -3,7 +3,7 @@
 //spellchecker:words proto
 package proto
 
-//spellchecker:words encoding json github pkglib websocketx
+//spellchecker:words encoding json
 import (
 	"encoding/json"
 	"fmt"
@@ -37,7 +37,7 @@ type Result struct {
 	Reason error
 }
 
-// MarshalJSON marshals this result as a message
+// MarshalJSON marshals this result as a message.
 func (res *Result) MarshalJSON() ([]byte, error) {
 	if res == nil {
 		return []byte(`{"status":"pending"}`), nil
@@ -52,7 +52,7 @@ func (res *Result) MarshalJSON() ([]byte, error) {
 
 	content := (func() string {
 		defer func() {
-			recover() // ignore any panic()s during the marshal
+			_ = recover() // ignore any panic()s during the marshal
 		}()
 
 		// find the object to marshal

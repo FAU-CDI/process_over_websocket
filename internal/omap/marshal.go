@@ -1,12 +1,15 @@
+//spellchecker:words omap
 package omap
 
+//spellchecker:words bytes encoding json errors
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
-// MarshalJSON marshals the OrderedMap back into a map
+// MarshalJSON marshals the OrderedMap back into a map.
 func (om OrderedMap) MarshalJSON() ([]byte, error) {
 	if om == nil {
 		return []byte(`null`), nil
@@ -22,7 +25,7 @@ func (om OrderedMap) MarshalJSON() ([]byte, error) {
 	for i, entry := range om {
 		key, err := json.Marshal(entry.Key)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal key %q: %w", entry.Key, err)
 		}
 
 		buffer.Write(key)
@@ -40,13 +43,13 @@ func (om OrderedMap) MarshalJSON() ([]byte, error) {
 
 var errWantObjectStart = errors.New("expected object start")
 
-// UnmarshalJSON unmarshals data into a byte
+// UnmarshalJSON unmarshals data into a byte.
 func (om *OrderedMap) UnmarshalJSON(data []byte) error {
 	d := json.NewDecoder(bytes.NewReader(data))
 
 	t, err := d.Token()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read token: %w", err)
 	}
 	if t != json.Delim('{') {
 		return errWantObjectStart
@@ -59,7 +62,7 @@ func (om *OrderedMap) UnmarshalJSON(data []byte) error {
 		// read the next token
 		tok, err := d.Token()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to read token: %w", err)
 		}
 
 		// end of object
@@ -83,7 +86,7 @@ func (om *OrderedMap) UnmarshalJSON(data []byte) error {
 	}
 }
 
-// parseValue parses the actual raw value starting at start, and ending at end
+// parseValue parses the actual raw value starting at start, and ending at end.
 func parseValue(data []byte, start int64, end int64) json.RawMessage {
 	value := data[start:end]
 
@@ -96,18 +99,18 @@ func parseValue(data []byte, start int64, end int64) json.RawMessage {
 
 var errObjectEnded = errors.New("object or array ended unexpectedly")
 
-// readValue reads a value from d, and returns the start and end of it
+// readValue reads a value from d, and returns the start and end of it.
 func readValue(d *json.Decoder) (err error) {
 	t, err := d.Token()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read value from decoder: %w", err)
 	}
 
 	switch t {
 	case json.Delim('['), json.Delim('{'):
 		for {
 			if err := readValue(d); err != nil {
-				if err == errObjectEnded {
+				if errors.Is(err, errObjectEnded) {
 					break
 				}
 				return err

@@ -5,6 +5,7 @@ package finbuf
 
 //spellchecker:words sync github pkglib ringbuffer status
 import (
+	"fmt"
 	"sync"
 
 	"github.com/tkw1536/pkglib/ringbuffer"
@@ -25,7 +26,7 @@ type FiniteBuffer struct {
 	lines    *ringbuffer.RingBuffer[string]
 }
 
-// init ensures that the FiniteBuffer is initialized
+// init ensures that the FiniteBuffer is initialized.
 func (fb *FiniteBuffer) init() {
 	fb.doInit.Do(func() {
 		fb.buf.Line = fb.line
@@ -50,10 +51,14 @@ func (fb *FiniteBuffer) line(line string) {
 func (fb *FiniteBuffer) Write(data []byte) (int, error) {
 	fb.init()
 
-	return fb.buf.Write(data)
+	n, err := fb.buf.Write(data)
+	if err != nil {
+		return n, fmt.Errorf("failed to read from buffer: %w", err)
+	}
+	return n, nil
 }
 
-// String returns a copy of the lines contained in the buffer
+// String returns a copy of the lines contained in the buffer.
 func (fb *FiniteBuffer) String() string {
 	fb.init()
 

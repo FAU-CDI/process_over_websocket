@@ -15,8 +15,8 @@ import (
 
 	"github.com/FAU-CDI/process_over_websocket/internal/clean"
 	"github.com/FAU-CDI/process_over_websocket/proto"
-	"github.com/tkw1536/pkglib/errorsx"
-	"github.com/tkw1536/pkglib/websocketx"
+	"go.tkw01536.de/pkglib/errorsx"
+	"go.tkw01536.de/pkglib/websocketx"
 )
 
 var (

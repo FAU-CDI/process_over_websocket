@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/swaggest/swgui/v5emb"
-	"github.com/tkw1536/pkglib/httpx"
+	"go.tkw01536.de/pkglib/httpx"
 
 	"github.com/FAU-CDI/process_over_websocket/internal/clean"
 	"github.com/FAU-CDI/process_over_websocket/internal/omap"

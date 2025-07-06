@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tkw1536/pkglib/ringbuffer"
-	"github.com/tkw1536/pkglib/status"
+	"go.tkw01536.de/pkglib/ringbuffer"
+	"go.tkw01536.de/pkglib/status"
 )
 
 // FiniteBuffer is an [io.Writer] that contains a maximal number of lines.

@@ -13,7 +13,7 @@ import (
 
 	"github.com/FAU-CDI/process_over_websocket/internal/finbuf"
 	"github.com/FAU-CDI/process_over_websocket/proto"
-	"github.com/tkw1536/pkglib/recovery"
+	"go.tkw01536.de/pkglib/recovery"
 )
 
 // Session holds information about an ongoing process.

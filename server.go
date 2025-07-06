@@ -9,7 +9,7 @@ import (
 	"github.com/FAU-CDI/process_over_websocket/internal/rest_impl"
 	"github.com/FAU-CDI/process_over_websocket/internal/ws_impl"
 	"github.com/FAU-CDI/process_over_websocket/proto"
-	"github.com/tkw1536/pkglib/websocketx"
+	"go.tkw01536.de/pkglib/websocketx"
 )
 
 // Server implements process_over_websocket protocol.

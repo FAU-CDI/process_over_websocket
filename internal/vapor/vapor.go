@@ -143,7 +143,7 @@ func (vap *Vapor[T]) start() {
 				fr = FinalizeReasonDeleted
 			case ttlcache.EvictionReasonExpired:
 				fr = FinalizeReasonExpired
-			case ttlcache.EvictionReasonCapacityReached:
+			case ttlcache.EvictionReasonCapacityReached, ttlcache.EvictionReasonMaxCostExceeded:
 				fallthrough
 			default:
 				panic("never reached: unknown eviction reason")
